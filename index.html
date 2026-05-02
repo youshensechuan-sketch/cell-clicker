@@ -2,10 +2,294 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>マイウェブサイト</title>
+    <title>Cell Evolution Clicker</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #111; font-family: 'Courier New', Courier, monospace; }
+        canvas { display: block; cursor: pointer; }
+        #ui {
+            position: absolute; top: 20px; left: 20px; color: #fff;
+            pointer-events: none; text-shadow: 1px 1px 2px #000;
+            background: rgba(0, 0, 0, 0.5); padding: 10px; border-radius: 8px;
+        }
+        #ui h1 { margin: 0 0 10px 0; font-size: 24px; }
+        #ui h2 { margin: 0 0 10px 0; font-size: 18px; color: #ffeb3b; }
+        #ui p { margin: 0; font-size: 14px; color: #aaa; }
+    </style>
 </head>
 <body>
-    <h1>こんにちは！</h1>
+    <div id="ui">
+        <h1>Cells: <span id="count">0</span></h1>
+        <h2>Stocked Jars: <span id="jar-count">0</span></h2>
+        <p>細胞をクリックして分裂・進化させよう</p>
+        <p>250個に達すると瓶詰めされます</p>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const countDisplay = document.getElementById('count');
+        const jarDisplay = document.getElementById('jar-count');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let cells = [];
+        const MAX_CELLS = 250; 
+        let stockedJars = 0;       
+        let isStocking = false;     
+
+        const jarPos = {
+            x: canvas.width - 100,
+            y: canvas.height - 120,
+            width: 80,
+            height: 100
+        };
+
+        function getHslString(h, s, l) {
+            return `hsl(${h}, ${s}%, ${l}%)`;
+        }
+
+        class Cell {
+            constructor(x, y, radius, h, s, l, vx, vy) {
+                this.x = x;
+                this.y = y;
+                this.baseRadius = radius; 
+                this.radius = radius * 0.4; 
+                this.h = h; 
+                this.s = s; 
+                this.l = l; 
+                this.color = getHslString(this.h, this.s, this.l);
+                this.vx = vx;
+                this.vy = vy;
+                this.friction = 0.96;
+                this.isGrowing = true; 
+                this.growthRate = 0.5; 
+                this.markedForRemoval = false;
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+
+                if (this.isGrowing) {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius + 2, 0, Math.PI * 2);
+                    ctx.strokeStyle = `rgba(255, 255, 255, ${0.1 + Math.random() * 0.1})`;
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
+
+                if (!isStocking) {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius * 0.3, 0, Math.PI * 2);
+                    ctx.fillStyle = getHslString(this.h, this.s, this.l - 20); 
+                    ctx.fill();
+                    ctx.closePath();
+                }
+            }
+
+            update() {
+                if (isStocking) {
+                    const targetX = jarPos.x + jarPos.width / 2;
+                    const targetY = jarPos.y;
+                    const dx = targetX - this.x;
+                    const dy = targetY - this.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist > 5) {
+                        const speed = (MAX_CELLS - cells.length) * 0.01 + 2; 
+                        const angle = Math.atan2(dy, dx);
+                        this.vx = Math.cos(angle) * speed;
+                        this.vy = Math.sin(angle) * speed;
+                        this.x += this.vx;
+                        this.y += this.vy;
+                    } else {
+                        this.markedForRemoval = true;
+                    }
+                    return; 
+                }
+
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vx *= this.friction;
+                this.vy *= this.friction;
+
+                if (this.x - this.radius < 0) { this.x = this.radius; this.vx *= -1; }
+                if (this.x + this.radius > canvas.width) { this.x = canvas.width - this.radius; this.vx *= -1; }
+                if (this.y - this.radius < 0) { this.y = this.radius; this.vy *= -1; }
+                if (this.y + this.radius > canvas.height) { this.y = canvas.height - this.radius; this.vy *= -1; }
+
+                if (this.isGrowing) {
+                    this.radius += this.growthRate;
+                    if (this.radius >= this.baseRadius) {
+                        this.radius = this.baseRadius;
+                        this.isGrowing = false; 
+                    }
+                }
+            }
+
+            split() {
+                const angle = Math.random() * Math.PI * 2;
+                const offset = this.radius * 0.4;
+                const speed = 6;
+                const nextH = (this.h + (Math.random() - 0.5) * 30) % 360;
+
+                const c1 = new Cell(this.x + Math.cos(angle) * offset, this.y + Math.sin(angle) * offset, this.baseRadius, nextH, this.s, this.l, Math.cos(angle) * speed, Math.sin(angle) * speed);
+                const c2 = new Cell(this.x - Math.cos(angle) * offset, this.y - Math.sin(angle) * offset, this.baseRadius, nextH, this.s, this.l, -Math.cos(angle) * speed, -Math.sin(angle) * speed);
+
+                return [c1, c2];
+            }
+        }
+
+        function drawJar() {
+            const { x, y, width, height } = jarPos;
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#fff';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x, y + height - 10);
+            ctx.quadraticCurveTo(x, y + height, x + 10, y + height);
+            ctx.lineTo(x + width - 10, y + height);
+            ctx.quadraticCurveTo(x + width, y + height, x + width, y + height - 10);
+            ctx.lineTo(x + width, y);
+            ctx.closePath();
+            ctx.stroke();
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.rect(x + width * 0.1, y - 10, width * 0.8, 15);
+            ctx.fillStyle = '#aaa';
+            ctx.fill();
+            ctx.stroke();
+
+            if (isStocking && cells.length > 0) {
+                const fillPercent = 1 - (cells.length / MAX_CELLS);
+                ctx.fillStyle = `hsla(333, 100%, 75%, ${0.3 + fillPercent * 0.5})`; 
+                ctx.beginPath();
+                ctx.rect(x + 4, y + height - 4 - (height * fillPercent), width - 8, height * fillPercent);
+                ctx.fill();
+            }
+        }
+
+        function resetGame() {
+            isStocking = false;
+            cells = [];
+            stockedJars++; 
+            jarDisplay.innerText = stockedJars; 
+            countDisplay.innerText = 0;
+            localStorage.setItem('cell_jars', stockedJars);
+            
+            setTimeout(() => {
+                cells.push(new Cell(canvas.width / 2, canvas.height / 2, 28, 333, 100, 75, 0, 0));
+                countDisplay.innerText = 1;
+            }, 1000);
+        }
+
+        // ★ 1つにまとめたメインのアニメーション関数
+        function animate() {
+            // 背景のクリア
+            ctx.fillStyle = isStocking ? 'rgba(10, 10, 10, 0.3)' : 'rgba(17, 17, 17, 1)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 1000個判定
+            if (!isStocking && cells.length >= MAX_CELLS) {
+                isStocking = true;
+            }
+
+            drawJar();
+
+            // 細胞同士の反発計算
+            if (!isStocking) {
+                for (let i = 0; i < cells.length; i++) {
+                    for (let j = i + 1; j < cells.length; j++) {
+                        const dx = cells[j].x - cells[i].x;
+                        const dy = cells[j].y - cells[i].y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        const minDistance = cells[i].radius + cells[j].radius;
+
+                        if (distance < minDistance) {
+                            const angle = Math.atan2(dy, dx);
+                            const force = (minDistance - distance) * 0.08; 
+                            cells[i].vx -= Math.cos(angle) * force;
+                            cells[i].vy -= Math.sin(angle) * force;
+                            cells[j].vx += Math.cos(angle) * force;
+                            cells[j].vy += Math.sin(angle) * force;
+                        }
+                    }
+                }
+            }
+
+            // 細胞の更新と描画
+            cells.forEach(cell => {
+                cell.update();
+                cell.draw();
+            });
+
+            // 吸い込まれた細胞を配列から削除
+            if (isStocking) {
+                cells = cells.filter(cell => !cell.markedForRemoval);
+                countDisplay.innerText = cells.length; 
+
+                // 全細胞が吸い込まれたらリセット
+                if (cells.length === 0 && isStocking) {
+                    resetGame();
+                }
+            }
+
+            // ループ処理
+            requestAnimationFrame(animate);
+        }
+
+        canvas.addEventListener('mousedown', (e) => {
+            if (isStocking) return;
+            let splitOccurred = false;
+            for (let i = cells.length - 1; i >= 0; i--) {
+                if (cells[i].isGrowing) continue;
+
+                const dx = e.clientX - cells[i].x;
+                const dy = e.clientY - cells[i].y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist < cells[i].radius && cells.length < MAX_CELLS) {
+                    const newCells = cells[i].split();
+                    cells.splice(i, 1, ...newCells);
+                    splitOccurred = true;
+                    break;
+                }
+            }
+            countDisplay.innerText = cells.length;
+        });
+
+        // ページ読み込み時の初期化処理
+        function initGame() {
+            // ローカルストレージから瓶の数を復元
+            const savedJars = localStorage.getItem('cell_jars');
+            if (savedJars) {
+                stockedJars = parseInt(savedJars);
+                jarDisplay.innerText = stockedJars;
+            }
+
+            cells = []; 
+            cells.push(new Cell(canvas.width / 2, canvas.height / 2, 28, 333, 100, 75, 0, 0));
+            countDisplay.innerText = cells.length;
+        }
+
+        // 実行開始
+        initGame();
+        animate();
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            // リサイズ時に瓶の位置も更新する
+            jarPos.x = canvas.width - 100;
+            jarPos.y = canvas.height - 120;
+        });
+    </script>
 </body>
 </html>
