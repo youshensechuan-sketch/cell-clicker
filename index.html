@@ -8,12 +8,24 @@
         canvas { display: block; cursor: pointer; }
         #ui {
             position: absolute; top: 20px; left: 20px; color: #fff;
-            pointer-events: none; text-shadow: 1px 1px 2px #000;
-            background: rgba(0, 0, 0, 0.5); padding: 10px; border-radius: 8px;
+            background: rgba(0, 0, 0, 0.7); padding: 15px; border-radius: 8px;
+            max-width: 280px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         }
-        #ui h1 { margin: 0 0 10px 0; font-size: 24px; }
+        #ui h1 { margin: 0 0 5px 0; font-size: 24px; }
         #ui h2 { margin: 0 0 10px 0; font-size: 18px; color: #ffeb3b; }
-        #ui p { margin: 0; font-size: 14px; color: #aaa; }
+        #ui p { margin: 0 0 5px 0; font-size: 12px; color: #aaa; line-height: 1.3; }
+        
+        /* ★ ショップ用のスタイル */
+        .shop { margin-top: 15px; border-top: 1px solid #444; padding-top: 10px; }
+        .shop h3 { margin: 0 0 10px 0; font-size: 14px; color: #ffeb3b; letter-spacing: 1px; }
+        .shop-item { margin-bottom: 12px; font-size: 11px; color: #ddd; }
+        .shop-btn {
+            margin-top: 4px; background: #333; color: #fff; border: 1px solid #666;
+            padding: 5px 10px; border-radius: 4px; cursor: pointer; font-family: inherit; width: 100%;
+            transition: background 0.2s;
+        }
+        .shop-btn:hover { background: #444; }
+        .shop-btn:disabled { background: #1a1a1a; color: #444; border-color: #222; cursor: not-allowed; }
     </style>
 </head>
 <body>
@@ -21,7 +33,19 @@
         <h1>Cells: <span id="count">0</span></h1>
         <h2>Stocked Jars: <span id="jar-count">0</span></h2>
         <p>細胞をクリックして分裂・進化させよう</p>
-        <p>250個に達すると瓶詰めされます</p>
+        <p>1000個に達すると瓶詰めされます</p>
+        
+        <div class="shop">
+            <h3>🧬 SHOP 🧬</h3>
+            <div class="shop-item">
+                <span>栄養剤 (Lv.<span id="nutrient-level">0</span>): 分裂数アップ</span>
+                <button id="buy-nutrient" class="shop-btn">購入 (瓶:<span id="nutrient-cost">1</span>個)</button>
+            </div>
+            <div class="shop-item">
+                <span>培養液 (Lv.<span id="culture-level">0</span>): 毎秒自動生成</span>
+                <button id="buy-culture" class="shop-btn">購入 (瓶:<span id="culture-cost">1</span>個)</button>
+            </div>
+        </div>
     </div>
     <canvas id="gameCanvas"></canvas>
 
@@ -31,13 +55,28 @@
         const countDisplay = document.getElementById('count');
         const jarDisplay = document.getElementById('jar-count');
 
+        // ★ ショップ用UIの取得
+        const nutrientLvlDisplay = document.getElementById('nutrient-level');
+        const nutrientCostDisplay = document.getElementById('nutrient-cost');
+        const cultureLvlDisplay = document.getElementById('culture-level');
+        const cultureCostDisplay = document.getElementById('culture-cost');
+        const buyNutrientBtn = document.getElementById('buy-nutrient');
+        const buyCultureBtn = document.getElementById('buy-culture');
+
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
 
         let cells = [];
-        const MAX_CELLS = 250; 
+        const MAX_CELLS = 1000; 
         let stockedJars = 0;       
         let isStocking = false;     
+
+        // ★ ショップ用の状態変数
+        let nutrientLevel = 0;
+        let cultureFluidLevel = 0;
+        let nutrientCost = 1;
+        let cultureFluidCost = 1;
+        let lastAutoGrowTime = performance.now(); // 自動生成タイマー用
 
         const jarPos = {
             x: canvas.width - 100,
@@ -131,16 +170,27 @@
                 }
             }
 
+            // ★ 栄養剤のレベルに応じて分裂数を増やす処理
             split() {
-                const angle = Math.random() * Math.PI * 2;
-                const offset = this.radius * 0.4;
+                const angleStep = Math.random() * Math.PI * 2;
+                const count = 2 + nutrientLevel; // レベル0なら2個、レベル1なら3個...
                 const speed = 6;
-                const nextH = (this.h + (Math.random() - 0.5) * 30) % 360;
+                const newCells = [];
 
-                const c1 = new Cell(this.x + Math.cos(angle) * offset, this.y + Math.sin(angle) * offset, this.baseRadius, nextH, this.s, this.l, Math.cos(angle) * speed, Math.sin(angle) * speed);
-                const c2 = new Cell(this.x - Math.cos(angle) * offset, this.y - Math.sin(angle) * offset, this.baseRadius, nextH, this.s, this.l, -Math.cos(angle) * speed, -Math.sin(angle) * speed);
+                for (let i = 0; i < count; i++) {
+                    // 放射状にきれいに散らばるように角度を計算
+                    const angle = angleStep + (i * (Math.PI * 2) / count);
+                    const offset = this.radius * 0.4;
+                    const nextH = (this.h + (Math.random() - 0.5) * 30) % 360;
 
-                return [c1, c2];
+                    newCells.push(new Cell(
+                        this.x + Math.cos(angle) * offset,
+                        this.y + Math.sin(angle) * offset,
+                        this.baseRadius, nextH, this.s, this.l,
+                        Math.cos(angle) * speed, Math.sin(angle) * speed
+                    ));
+                }
+                return newCells;
             }
         }
 
@@ -176,6 +226,21 @@
             }
         }
 
+        // ★ ショップUIの更新と購入制限の管理
+        function updateShopUI() {
+            nutrientCost = nutrientLevel + 1;
+            cultureFluidCost = cultureFluidLevel + 1;
+
+            nutrientLvlDisplay.innerText = nutrientLevel;
+            nutrientCostDisplay.innerText = nutrientCost;
+            cultureLvlDisplay.innerText = cultureFluidLevel;
+            cultureCostDisplay.innerText = cultureFluidCost;
+
+            // 瓶が足りない時や、瓶詰め演出中はボタンを無効化
+            buyNutrientBtn.disabled = (stockedJars < nutrientCost || isStocking);
+            buyCultureBtn.disabled = (stockedJars < cultureFluidCost || isStocking);
+        }
+
         function resetGame() {
             isStocking = false;
             cells = [];
@@ -183,6 +248,7 @@
             jarDisplay.innerText = stockedJars; 
             countDisplay.innerText = 0;
             localStorage.setItem('cell_jars', stockedJars);
+            updateShopUI(); // 瓶が増えたのでショップを更新
             
             setTimeout(() => {
                 cells.push(new Cell(canvas.width / 2, canvas.height / 2, 28, 333, 100, 75, 0, 0));
@@ -190,20 +256,50 @@
             }, 1000);
         }
 
-        // ★ 1つにまとめたメインのアニメーション関数
         function animate() {
-            // 背景のクリア
             ctx.fillStyle = isStocking ? 'rgba(10, 10, 10, 0.3)' : 'rgba(17, 17, 17, 1)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // 1000個判定
+            // ★ 培養液による自動生成ロジック (1秒ごと)
+            const now = performance.now();
+            if (!isStocking && cultureFluidLevel > 0 && now - lastAutoGrowTime >= 1000) {
+                // 1秒間にレベルの数だけ細胞を追加（上限を超えないように制御）
+                const spawnCount = Math.min(cultureFluidLevel, MAX_CELLS - cells.length);
+                for (let i = 0; i < spawnCount; i++) {
+                    let spawnX = canvas.width / 2;
+                    let spawnY = canvas.height / 2;
+                    let baseH = 333;
+
+                    // 既存の細胞があれば、その近くからポコッと生やす
+                    if (cells.length > 0) {
+                        const randomCell = cells[Math.floor(Math.random() * cells.length)];
+                        spawnX = randomCell.x + (Math.random() - 0.5) * 30;
+                        spawnY = randomCell.y + (Math.random() - 0.5) * 30;
+                        baseH = randomCell.h;
+                    }
+
+                    const nextH = (baseH + (Math.random() - 0.5) * 30) % 360;
+                    const speed = 2;
+                    const angle = Math.random() * Math.PI * 2;
+
+                    cells.push(new Cell(
+                        spawnX, spawnY, 28, nextH, 100, 75,
+                        Math.cos(angle) * speed, Math.sin(angle) * speed
+                    ));
+                }
+                lastAutoGrowTime = now;
+                countDisplay.innerText = cells.length;
+            } else if (isStocking) {
+                lastAutoGrowTime = now; // 瓶詰め中は自動生成タイマーを一時停止
+            }
+
             if (!isStocking && cells.length >= MAX_CELLS) {
                 isStocking = true;
+                updateShopUI(); // 瓶詰め開始時にショップを無効化
             }
 
             drawJar();
 
-            // 細胞同士の反発計算
             if (!isStocking) {
                 for (let i = 0; i < cells.length; i++) {
                     for (let j = i + 1; j < cells.length; j++) {
@@ -224,26 +320,51 @@
                 }
             }
 
-            // 細胞の更新と描画
             cells.forEach(cell => {
                 cell.update();
                 cell.draw();
             });
 
-            // 吸い込まれた細胞を配列から削除
             if (isStocking) {
                 cells = cells.filter(cell => !cell.markedForRemoval);
                 countDisplay.innerText = cells.length; 
 
-                // 全細胞が吸い込まれたらリセット
                 if (cells.length === 0 && isStocking) {
                     resetGame();
                 }
             }
 
-            // ループ処理
             requestAnimationFrame(animate);
         }
+
+        // ★ UI（ショップなど）をクリックしたときに後ろの画面が反応するのを防ぐ
+        document.getElementById('ui').addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+        });
+
+        // ★ 栄養剤の購入処理
+        document.getElementById('buy-nutrient').addEventListener('click', () => {
+            if (stockedJars >= nutrientCost && !isStocking) {
+                stockedJars -= nutrientCost;
+                nutrientLevel++;
+                localStorage.setItem('cell_jars', stockedJars);
+                localStorage.setItem('cell_nutrient_lvl', nutrientLevel);
+                jarDisplay.innerText = stockedJars;
+                updateShopUI();
+            }
+        });
+
+        // ★ 培養液の購入処理
+        document.getElementById('buy-culture').addEventListener('click', () => {
+            if (stockedJars >= cultureFluidCost && !isStocking) {
+                stockedJars -= cultureFluidCost;
+                cultureFluidLevel++;
+                localStorage.setItem('cell_jars', stockedJars);
+                localStorage.setItem('cell_culture_lvl', cultureFluidLevel);
+                jarDisplay.innerText = stockedJars;
+                updateShopUI();
+            }
+        });
 
         canvas.addEventListener('mousedown', (e) => {
             if (isStocking) return;
@@ -265,28 +386,31 @@
             countDisplay.innerText = cells.length;
         });
 
-        // ページ読み込み時の初期化処理
         function initGame() {
-            // ローカルストレージから瓶の数を復元
+            // セーブデータの復元（ショップレベルも含む）
             const savedJars = localStorage.getItem('cell_jars');
-            if (savedJars) {
-                stockedJars = parseInt(savedJars);
-                jarDisplay.innerText = stockedJars;
-            }
+            if (savedJars) stockedJars = parseInt(savedJars);
+            jarDisplay.innerText = stockedJars;
+
+            const savedNutrient = localStorage.getItem('cell_nutrient_lvl');
+            if (savedNutrient) nutrientLevel = parseInt(savedNutrient);
+
+            const savedCulture = localStorage.getItem('cell_culture_lvl');
+            if (savedCulture) cultureFluidLevel = parseInt(savedCulture);
+
+            updateShopUI();
 
             cells = []; 
             cells.push(new Cell(canvas.width / 2, canvas.height / 2, 28, 333, 100, 75, 0, 0));
             countDisplay.innerText = cells.length;
         }
 
-        // 実行開始
         initGame();
         animate();
 
         window.addEventListener('resize', () => {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
-            // リサイズ時に瓶の位置も更新する
             jarPos.x = canvas.width - 100;
             jarPos.y = canvas.height - 120;
         });
