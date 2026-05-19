@@ -30,13 +30,13 @@
 </head>
 <body>
     <div id="ui">
-        <h1>Cells: <span id="count">0</span></h1>
-        <h2>Stocked Jars: <span id="jar-count">0</span></h2>
+        <h1>細胞数: <span id="count">0</span></h1>
+        <h2>瓶のストック: <span id="jar-count">0</span></h2>
         <p>細胞をクリックして分裂・進化させよう</p>
-        <p>1000個に達すると瓶詰めされます</p>
+        <p>200個に達すると瓶詰めされます</p>
         
         <div class="shop">
-            <h3>🧬 SHOP 🧬</h3>
+            <h3>🧬 ショップ 🧬</h3>
             <div class="shop-item">
                 <span>栄養剤 (Lv.<span id="nutrient-level">0</span>): 分裂数アップ</span>
                 <button id="buy-nutrient" class="shop-btn">購入 (瓶:<span id="nutrient-cost">1</span>個)</button>
@@ -67,7 +67,7 @@
         canvas.height = window.innerHeight;
 
         let cells = [];
-        const MAX_CELLS = 1000; 
+        const MAX_CELLS = 200; 
         let stockedJars = 0;       
         let isStocking = false;     
 
