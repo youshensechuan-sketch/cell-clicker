@@ -4,58 +4,136 @@
     <meta charset="UTF-8">
     <title>Cell Evolution Clicker</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #111; font-family: 'Courier New', Courier, monospace; }
-        canvas { display: block; cursor: pointer; }
-        #ui {
-            position: absolute; top: 20px; left: 20px; color: #fff;
-            background: rgba(0, 0, 0, 0.7); padding: 15px; border-radius: 8px;
-            max-width: 280px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-        }
-        #ui h1 { margin: 0 0 5px 0; font-size: 24px; }
-        #ui h2 { margin: 0 0 10px 0; font-size: 18px; color: #ffeb3b; }
-        #ui p { margin: 0 0 5px 0; font-size: 12px; color: #aaa; line-height: 1.3; }
+        body { margin: 0; overflow: hidden; background-color: #050508; font-family: 'Courier New', Courier, monospace; user-select: none; }
+        canvas { display: block; position: absolute; top: 0; left: 0; }
         
-        /* ★ ショップ用のスタイル */
-        .shop { margin-top: 15px; border-top: 1px solid #444; padding-top: 10px; }
+        /* 共通UIスタイル */
+        .ui-panel {
+            position: absolute; color: #fff; background: rgba(5, 5, 10, 0.85);
+            padding: 15px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            border: 1px solid #223; pointer-events: auto; z-index: 10;
+        }
+
+        /* --- メインゲーム画面のUI --- */
+        #main-ui { top: 20px; left: 20px; max-width: 280px; }
+        #main-ui h1 { margin: 0 0 5px 0; font-size: 24px; }
+        #main-ui h2 { margin: 0 0 10px 0; font-size: 18px; color: #ffeb3b; }
+        #main-ui p { margin: 0 0 5px 0; font-size: 12px; color: #aaa; line-height: 1.3; }
+        
+        .shop { margin-top: 15px; border-top: 1px solid #334; padding-top: 10px; }
         .shop h3 { margin: 0 0 10px 0; font-size: 14px; color: #ffeb3b; letter-spacing: 1px; }
         .shop-item { margin-bottom: 12px; font-size: 11px; color: #ddd; }
         .shop-btn {
-            margin-top: 4px; background: #333; color: #fff; border: 1px solid #666;
+            margin-top: 4px; background: #151525; color: #fff; border: 1px solid #446;
             padding: 5px 10px; border-radius: 4px; cursor: pointer; font-family: inherit; width: 100%;
-            transition: background 0.2s;
+            transition: all 0.2s;
         }
-        .shop-btn:hover { background: #444; }
-        .shop-btn:disabled { background: #1a1a1a; color: #444; border-color: #222; cursor: not-allowed; }
+        .shop-btn:hover:not(:disabled) { background: #252545; border-color: #00e5ff; }
+        .shop-btn:disabled { background: #101015; color: #444; border-color: #222; cursor: not-allowed; }
+
+        /* 転生画面へ進むためのメインボタン */
+        .nav-btn {
+            margin-top: 15px; background: #2a1035; color: #e040fb; border: 1px solid #7b1fa2;
+            padding: 10px; border-radius: 4px; cursor: pointer; font-family: inherit; width: 100%;
+            font-weight: bold; letter-spacing: 1px; transition: all 0.3s;
+        }
+        .nav-btn:hover { background: #4a148c; color: #fff; box-shadow: 0 0 10px #e040fb; }
+
+        /* --- プレステージ（神経系ツリー）画面のUI --- */
+        #prestige-screen {
+            display: none; position: absolute; width: 100%; height: 100%;
+            top: 0; left: 0; z-index: 5; background-color: #040408;
+        }
+        #prestige-ui-top { top: 20px; left: 20px; width: 300px; border: 1px solid #00e5ff; }
+        #prestige-ui-top h2 { margin: 0 0 5px 0; font-size: 20px; color: #00e5ff; text-shadow: 0 0 8px rgba(0,229,255,0.5); }
+        
+        /* スキル詳細ポップアップ用パネル */
+        #node-detail-panel {
+            bottom: 20px; left: 20px; width: 300px; display: none; border: 1px solid #e040fb;
+            box-shadow: 0 0 15px rgba(224,64,251,0.3);
+        }
+        #node-detail-panel h3 { margin: 0 0 5px 0; color: #e040fb; }
+        
+        .action-btn {
+            background: #00e5ff; color: #000; border: none; padding: 8px 15px;
+            border-radius: 4px; cursor: pointer; font-family: inherit; font-weight: bold;
+            transition: all 0.2s; width: 100%; margin-top: 10px;
+        }
+        .action-btn:hover:not(:disabled) { background: #fff; box-shadow: 0 0 10px #fff; }
+        .action-btn:disabled { background: #222; color: #555; cursor: not-allowed; }
+        
+        .back-btn {
+            background: #222; color: #aaa; border: 1px solid #444; padding: 8px 15px;
+            border-radius: 4px; cursor: pointer; font-family: inherit; width: 100%; margin-top: 10px;
+        }
+        .back-btn:hover { color: #fff; background: #333; }
     </style>
 </head>
 <body>
-    <div id="ui">
-        <h1>細胞数: <span id="count">0</span></h1>
-        <h2>瓶のストック: <span id="jar-count">0</span></h2>
-        <p>細胞をクリックして分裂・進化させよう</p>
-        <p>200個に達すると瓶詰めされます</p>
-        
-        <div class="shop">
-            <h3>🧬 ショップ 🧬</h3>
-            <div class="shop-item">
-                <span>栄養剤 (Lv.<span id="nutrient-level">0</span>): 分裂数アップ</span>
-                <button id="buy-nutrient" class="shop-btn">購入 (瓶:<span id="nutrient-cost">1</span>個)</button>
+
+    <div id="main-screen">
+        <div id="main-ui" class="ui-panel">
+            <h1>細胞数: <span id="count">0</span> / <span id="max-count">200</span></h1>
+            <h2>瓶のストック: <span id="jar-count">0</span></h2>
+            <p>細胞をクリックして分裂・進化させよう</p>
+            <p id="condition-text">200個に達すると瓶詰めされます</p>
+            
+            <div class="shop">
+                <h3>🧪 ショップ 🧪</h3>
+                <div class="shop-item">
+                    <span>栄養剤 (Lv.<span id="nutrient-level">0</span>)</span>
+                    <button id="buy-nutrient" class="shop-btn">購入 (瓶:<span id="nutrient-cost">1</span>個)</button>
+                </div>
+                <div class="shop-item">
+                    <span>培養液 (Lv.<span id="culture-level">0</span>)</span>
+                    <button id="buy-culture" class="shop-btn">購入 (瓶:<span id="culture-cost">1</span>個)</button>
+                </div>
             </div>
-            <div class="shop-item">
-                <span>培養液 (Lv.<span id="culture-level">0</span>): 毎秒自動生成</span>
-                <button id="buy-culture" class="shop-btn">購入 (瓶:<span id="culture-cost">1</span>個)</button>
-            </div>
+            
+            <button id="go-prestige-btn" class="nav-btn">🧬 遺伝子研究所 (転生)</button>
         </div>
+        <canvas id="gameCanvas"></canvas>
     </div>
-    <canvas id="gameCanvas"></canvas>
+
+    <div id="prestige-screen">
+        <div id="prestige-ui-top" class="ui-panel">
+            <h2>🧠 神経系ツリー進化</h2>
+            <p>累計の瓶獲得数: <span id="total-jars">0</span>個</p>
+            <p>現在の転生ポイント: <b style="color:#00e5ff;"><span id="tp-count">0</span> TP</b></p>
+            <p style="font-size:10px; color:#aaa; margin: 5px 0;">次まで必要な瓶: <span id="next-tp-jars">0</span>個</p>
+            
+            <button id="prestige-trigger" class="action-btn" style="background:#e040fb; color:#fff;">
+                遺伝子転生を実行 (+<span id="pending-tp">0</span> TP)
+            </button>
+            <button id="back-to-main-btn" class="back-btn">← 培養室に戻る</button>
+        </div>
+
+        <div id="node-detail-panel" class="ui-panel">
+            <h3 id="node-name">ノード名</h3>
+            <p id="node-desc" style="font-size:12px; color:#ddd; margin:5px 0;"></p>
+            <p style="font-size:11px; color:#888;">レベル: <span id="node-level">0/0</span></p>
+            <button id="node-upgrade-btn" class="action-btn">神経を強化 (コスト: <span id="node-cost">1</span> TP)</button>
+        </div>
+        
+        <canvas id="prestigeCanvas"></canvas>
+    </div>
 
     <script>
+        // キャンバスとコンテキストの取得
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const countDisplay = document.getElementById('count');
-        const jarDisplay = document.getElementById('jar-count');
+        const pCanvas = document.getElementById('prestigeCanvas');
+        const pCtx = pCanvas.getContext('2d');
 
-        // ★ ショップ用UIの取得
+        // 画面要素
+        const mainScreen = document.getElementById('main-screen');
+        const prestigeScreen = document.getElementById('prestige-screen');
+
+        // UI表示用要素
+        const countDisplay = document.getElementById('count');
+        const maxCountDisplay = document.getElementById('max-count');
+        const jarDisplay = document.getElementById('jar-count');
+        const conditionText = document.getElementById('condition-text');
         const nutrientLvlDisplay = document.getElementById('nutrient-level');
         const nutrientCostDisplay = document.getElementById('nutrient-cost');
         const cultureLvlDisplay = document.getElementById('culture-level');
@@ -63,99 +141,94 @@
         const buyNutrientBtn = document.getElementById('buy-nutrient');
         const buyCultureBtn = document.getElementById('buy-culture');
 
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+        const totalJarsDisplay = document.getElementById('total-jars');
+        const tpDisplay = document.getElementById('tp-count');
+        const nextTpJarsDisplay = document.getElementById('next-tp-jars');
+        const prestigeBtn = document.getElementById('prestige-trigger');
+        const pendingTpDisplay = document.getElementById('pending-tp');
+        
+        // ノード詳細UI
+        const detailPanel = document.getElementById('node-detail-panel');
+        const nodeNameDisp = document.getElementById('node-name');
+        const nodeDescDisp = document.getElementById('node-desc');
+        const nodeLvlDisp = document.getElementById('node-level');
+        const nodeCostDisp = document.getElementById('node-cost');
+        const nodeUpgradeBtn = document.getElementById('node-upgrade-btn');
 
+        // キャンバスサイズ初期化
+        canvas.width = pCanvas.width = window.innerWidth;
+        canvas.height = pCanvas.height = window.innerHeight;
+
+        // --- ゲーム状態変数 ---
+        let currentScreen = 'main'; // 'main' か 'prestige'
         let cells = [];
-        const MAX_CELLS = 200; 
+        let MAX_CELLS = 200;
         let stockedJars = 0;       
         let isStocking = false;     
 
-        // ★ ショップ用の状態変数
         let nutrientLevel = 0;
         let cultureFluidLevel = 0;
         let nutrientCost = 1;
         let cultureFluidCost = 1;
-        let lastAutoGrowTime = performance.now(); // 自動生成タイマー用
+        let lastAutoGrowTime = performance.now(); 
 
-        const jarPos = {
-            x: canvas.width - 100,
-            y: canvas.height - 120,
-            width: 80,
-            height: 100
+        let totalJars = 0;        
+        let prestigePoints = 0;   
+        let loopCount = 0;        
+        
+        // スキル構造データ（フォーマット）
+        let skills = {
+            grow:   { id: 'grow',   name: 'A: 細胞膜強化', desc: '細胞の初期成長速度が +30% されます。', lvl: 0, max: 5, cost: 1, x: 0, y: 0 },
+            double: { id: 'double', name: 'B: 多重収穫',   desc: '瓶詰め完了時、25%の確率で瓶が2個手に入ります。', lvl: 0, max: 3, cost: 2, x: 0, y: 0 },
+            burst:  { id: 'burst',  name: 'C: 異常繁殖',   desc: '培養液による自動生成時、10%の確率で3倍発生します。', lvl: 0, max: 1, cost: 3, x: 0, y: 0 }
         };
+        let selectedNodeId = null;
 
-        function getHslString(h, s, l) {
-            return `hsl(${h}, ${s}%, ${l}%)`;
+        // スキルノードの配置（神経系の中心ニューロンから広がる座標を設定）
+        function initNodePositions() {
+            const centerX = pCanvas.width / 2 + 100; // UIを避けるためやや右寄り
+            const centerY = pCanvas.height / 2;
+            skills.grow.x = centerX - 120;   skills.grow.y = centerY - 80;
+            skills.double.x = centerX + 120; skills.double.y = centerY - 80;
+            skills.burst.x = centerX;        skills.burst.y = centerY + 120;
         }
 
+        const jarPos = { x: canvas.width - 100, y: canvas.height - 120, width: 80, height: 100 };
+        function getHslString(h, s, l) { return `hsl(${h}, ${s}%, ${l}%)`; }
+
+        // --- 細胞オブジェクト ---
         class Cell {
             constructor(x, y, radius, h, s, l, vx, vy) {
-                this.x = x;
-                this.y = y;
-                this.baseRadius = radius; 
-                this.radius = radius * 0.4; 
-                this.h = h; 
-                this.s = s; 
-                this.l = l; 
+                this.x = x; this.y = y;
+                this.baseRadius = radius; this.radius = radius * 0.4; 
+                this.h = h; this.s = s; this.l = l; 
                 this.color = getHslString(this.h, this.s, this.l);
-                this.vx = vx;
-                this.vy = vy;
-                this.friction = 0.96;
+                this.vx = vx; this.vy = vy; this.friction = 0.96;
                 this.isGrowing = true; 
-                this.growthRate = 0.5; 
+                this.growthRate = 0.5 * (1 + skills.grow.lvl * 0.3); 
                 this.markedForRemoval = false;
             }
-
             draw() {
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-                ctx.fillStyle = this.color;
-                ctx.fill();
-
+                ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color; ctx.fill();
                 if (this.isGrowing) {
-                    ctx.beginPath();
-                    ctx.arc(this.x, this.y, this.radius + 2, 0, Math.PI * 2);
+                    ctx.beginPath(); ctx.arc(this.x, this.y, this.radius + 2, 0, Math.PI * 2);
                     ctx.strokeStyle = `rgba(255, 255, 255, ${0.1 + Math.random() * 0.1})`;
-                    ctx.lineWidth = 1;
-                    ctx.stroke();
-                }
-
-                if (!isStocking) {
-                    ctx.beginPath();
-                    ctx.arc(this.x, this.y, this.radius * 0.3, 0, Math.PI * 2);
-                    ctx.fillStyle = getHslString(this.h, this.s, this.l - 20); 
-                    ctx.fill();
-                    ctx.closePath();
+                    ctx.lineWidth = 1; ctx.stroke();
                 }
             }
-
             update() {
                 if (isStocking) {
-                    const targetX = jarPos.x + jarPos.width / 2;
-                    const targetY = jarPos.y;
-                    const dx = targetX - this.x;
-                    const dy = targetY - this.y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-
+                    const targetX = jarPos.x + jarPos.width / 2; const targetY = jarPos.y;
+                    const dx = targetX - this.x; const dy = targetY - this.y; const dist = Math.sqrt(dx * dx + dy * dy);
                     if (dist > 5) {
-                        const speed = (MAX_CELLS - cells.length) * 0.01 + 2; 
-                        const angle = Math.atan2(dy, dx);
-                        this.vx = Math.cos(angle) * speed;
-                        this.vy = Math.sin(angle) * speed;
-                        this.x += this.vx;
-                        this.y += this.vy;
-                    } else {
-                        this.markedForRemoval = true;
-                    }
+                        const speed = (MAX_CELLS - cells.length) * 0.02 + 2; const angle = Math.atan2(dy, dx);
+                        this.vx = Math.cos(angle) * speed; this.vy = Math.sin(angle) * speed;
+                        this.x += this.vx; this.y += this.vy;
+                    } else { this.markedForRemoval = true; }
                     return; 
                 }
-
-                this.x += this.vx;
-                this.y += this.vy;
-                this.vx *= this.friction;
-                this.vy *= this.friction;
-
+                this.x += this.vx; this.y += this.vy; this.vx *= this.friction; this.vy *= this.friction;
                 if (this.x - this.radius < 0) { this.x = this.radius; this.vx *= -1; }
                 if (this.x + this.radius > canvas.width) { this.x = canvas.width - this.radius; this.vx *= -1; }
                 if (this.y - this.radius < 0) { this.y = this.radius; this.vy *= -1; }
@@ -163,32 +236,15 @@
 
                 if (this.isGrowing) {
                     this.radius += this.growthRate;
-                    if (this.radius >= this.baseRadius) {
-                        this.radius = this.baseRadius;
-                        this.isGrowing = false; 
-                    }
+                    if (this.radius >= this.baseRadius) { this.radius = this.baseRadius; this.isGrowing = false; }
                 }
             }
-
-            // ★ 栄養剤のレベルに応じて分裂数を増やす処理
             split() {
-                const angleStep = Math.random() * Math.PI * 2;
-                const count = 2 + nutrientLevel; // レベル0なら2個、レベル1なら3個...
-                const speed = 6;
-                const newCells = [];
-
+                const angleStep = Math.random() * Math.PI * 2; const count = 2 + nutrientLevel; const speed = 6; const newCells = [];
                 for (let i = 0; i < count; i++) {
-                    // 放射状にきれいに散らばるように角度を計算
-                    const angle = angleStep + (i * (Math.PI * 2) / count);
-                    const offset = this.radius * 0.4;
+                    const angle = angleStep + (i * (Math.PI * 2) / count); const offset = this.radius * 0.4;
                     const nextH = (this.h + (Math.random() - 0.5) * 30) % 360;
-
-                    newCells.push(new Cell(
-                        this.x + Math.cos(angle) * offset,
-                        this.y + Math.sin(angle) * offset,
-                        this.baseRadius, nextH, this.s, this.l,
-                        Math.cos(angle) * speed, Math.sin(angle) * speed
-                    ));
+                    newCells.push(new Cell(this.x + Math.cos(angle) * offset, this.y + Math.sin(angle) * offset, this.baseRadius, nextH, this.s, this.l, Math.cos(angle) * speed, Math.sin(angle) * speed));
                 }
                 return newCells;
             }
@@ -196,209 +252,336 @@
 
         function drawJar() {
             const { x, y, width, height } = jarPos;
-            ctx.lineWidth = 4;
-            ctx.strokeStyle = '#fff';
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-
-            ctx.beginPath();
-            ctx.moveTo(x, y);
-            ctx.lineTo(x, y + height - 10);
-            ctx.quadraticCurveTo(x, y + height, x + 10, y + height);
-            ctx.lineTo(x + width - 10, y + height);
-            ctx.quadraticCurveTo(x + width, y + height, x + width, y + height - 10);
-            ctx.lineTo(x + width, y);
-            ctx.closePath();
-            ctx.stroke();
-            ctx.fill();
-
-            ctx.beginPath();
-            ctx.rect(x + width * 0.1, y - 10, width * 0.8, 15);
-            ctx.fillStyle = '#aaa';
-            ctx.fill();
-            ctx.stroke();
+            ctx.lineWidth = 4; ctx.strokeStyle = '#fff'; ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + height - 10);
+            ctx.quadraticCurveTo(x, y + height, x + 10, y + height); ctx.lineTo(x + width - 10, y + height);
+            ctx.quadraticCurveTo(x + width, y + height, x + width, y + height - 10); ctx.lineTo(x + width, y);
+            ctx.closePath(); ctx.stroke(); ctx.fill();
 
             if (isStocking && cells.length > 0) {
                 const fillPercent = 1 - (cells.length / MAX_CELLS);
                 ctx.fillStyle = `hsla(333, 100%, 75%, ${0.3 + fillPercent * 0.5})`; 
-                ctx.beginPath();
-                ctx.rect(x + 4, y + height - 4 - (height * fillPercent), width - 8, height * fillPercent);
+                ctx.beginPath(); ctx.rect(x + 4, y + height - 4 - (height * fillPercent), width - 8, height * fillPercent);
                 ctx.fill();
             }
         }
 
-        // ★ ショップUIの更新と購入制限の管理
+        // --- 数式ロジック ---
+        function calculateTotalTpFromJars(jars) { return jars < 1 ? 0 : Math.floor(Math.sqrt(jars)); }
+        function getJarsRequiredForTp(tp) { return Math.pow(tp, 2); }
+
         function updateShopUI() {
-            nutrientCost = nutrientLevel + 1;
-            cultureFluidCost = cultureFluidLevel + 1;
-
-            nutrientLvlDisplay.innerText = nutrientLevel;
-            nutrientCostDisplay.innerText = nutrientCost;
-            cultureLvlDisplay.innerText = cultureFluidLevel;
-            cultureCostDisplay.innerText = cultureFluidCost;
-
-            // 瓶が足りない時や、瓶詰め演出中はボタンを無効化
+            nutrientCost = nutrientLevel + 1; cultureFluidCost = cultureFluidLevel + 1;
+            nutrientLvlDisplay.innerText = nutrientLevel; nutrientCostDisplay.innerText = nutrientCost;
+            cultureLvlDisplay.innerText = cultureFluidLevel; cultureCostDisplay.innerText = cultureFluidCost;
             buyNutrientBtn.disabled = (stockedJars < nutrientCost || isStocking);
             buyCultureBtn.disabled = (stockedJars < cultureFluidCost || isStocking);
         }
 
-        function resetGame() {
-            isStocking = false;
-            cells = [];
-            stockedJars++; 
-            jarDisplay.innerText = stockedJars; 
-            countDisplay.innerText = 0;
-            localStorage.setItem('cell_jars', stockedJars);
-            updateShopUI(); // 瓶が増えたのでショップを更新
+        function updatePrestigeUI() {
+            totalJarsDisplay.innerText = totalJars; tpDisplay.innerText = prestigePoints;
             
-            setTimeout(() => {
-                cells.push(new Cell(canvas.width / 2, canvas.height / 2, 28, 333, 100, 75, 0, 0));
-                countDisplay.innerText = 1;
-            }, 1000);
+            const totalEarnedTp = calculateTotalTpFromJars(totalJars);
+            const currentSpentAndOwnedTp = prestigePoints + skills.grow.lvl * 1 + skills.double.lvl * 2 + skills.burst.lvl * 3;
+            const pendingTp = Math.max(0, totalEarnedTp - currentSpentAndOwnedTp);
+            
+            pendingTpDisplay.innerText = pendingTp;
+            prestigeBtn.disabled = (pendingTp < 1 || isStocking);
+
+            const nextTpNeedJars = getJarsRequiredForTp(totalEarnedTp + 1);
+            nextTpJarsDisplay.innerText = Math.max(0, nextTpNeedJars - totalJars);
+
+            // ノード詳細パネルが開いていれば更新
+            if (selectedNodeId) {
+                const node = skills[selectedNodeId];
+                nodeNameDisp.innerText = node.name;
+                nodeDescDisp.innerText = node.desc;
+                nodeLvlDisp.innerText = `${node.lvl} / ${node.max}`;
+                nodeCostDisp.innerText = node.cost;
+                nodeUpgradeBtn.disabled = (prestigePoints < node.cost || node.lvl >= node.max);
+            }
         }
 
-        function animate() {
-            ctx.fillStyle = isStocking ? 'rgba(10, 10, 10, 0.3)' : 'rgba(17, 17, 17, 1)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        function resetGame() {
+            isStocking = false; cells = [];
+            let earnedJars = 1;
+            if (Math.random() * 100 < skills.double.lvl * 25) { earnedJars = 2; }
+            stockedJars += earnedJars; totalJars += earnedJars;
+            jarDisplay.innerText = stockedJars; countDisplay.innerText = 0;
+            saveToLocalStorage(); updateShopUI(); updatePrestigeUI();
+            setTimeout(() => { cells.push(new Cell(canvas.width / 2, canvas.height / 2, 28, 333, 100, 75, 0, 0)); countDisplay.innerText = 1; }, 1000);
+        }
 
-            // ★ 培養液による自動生成ロジック (1秒ごと)
-            const now = performance.now();
-            if (!isStocking && cultureFluidLevel > 0 && now - lastAutoGrowTime >= 1000) {
-                // 1秒間にレベルの数だけ細胞を追加（上限を超えないように制御）
-                const spawnCount = Math.min(cultureFluidLevel, MAX_CELLS - cells.length);
-                for (let i = 0; i < spawnCount; i++) {
-                    let spawnX = canvas.width / 2;
-                    let spawnY = canvas.height / 2;
-                    let baseH = 333;
+        function triggerPrestige() {
+            const totalEarnedTp = calculateTotalTpFromJars(totalJars);
+            const currentSpentAndOwnedTp = prestigePoints + skills.grow.lvl * 1 + skills.double.lvl * 2 + skills.burst.lvl * 3;
+            const pendingTp = Math.max(0, totalEarnedTp - currentSpentAndOwnedTp);
+            if (pendingTp < 1) return;
 
-                    // 既存の細胞があれば、その近くからポコッと生やす
-                    if (cells.length > 0) {
-                        const randomCell = cells[Math.floor(Math.random() * cells.length)];
-                        spawnX = randomCell.x + (Math.random() - 0.5) * 30;
-                        spawnY = randomCell.y + (Math.random() - 0.5) * 30;
-                        baseH = randomCell.h;
-                    }
+            prestigePoints += pendingTp; loopCount++;
+            stockedJars = 0; nutrientLevel = 0; cultureFluidLevel = 0; cells = [];
+            
+            MAX_CELLS = 200 + loopCount * 50;
+            maxCountDisplay.innerText = MAX_CELLS;
+            conditionText.innerText = `${MAX_CELLS}個に達すると瓶詰めされます`;
 
-                    const nextH = (baseH + (Math.random() - 0.5) * 30) % 360;
-                    const speed = 2;
-                    const angle = Math.random() * Math.PI * 2;
+            saveToLocalStorage(); updateShopUI(); updatePrestigeUI();
+            cells.push(new Cell(canvas.width / 2, canvas.height / 2, 28, 333, 100, 75, 0, 0));
+            countDisplay.innerText = 1;
+        }
 
-                    cells.push(new Cell(
-                        spawnX, spawnY, 28, nextH, 100, 75,
-                        Math.cos(angle) * speed, Math.sin(angle) * speed
-                    ));
+        function saveToLocalStorage() {
+            localStorage.setItem('cell_jars', stockedJars);
+            localStorage.setItem('cell_total_jars', totalJars);
+            localStorage.setItem('cell_tp', prestigePoints);
+            localStorage.setItem('cell_loop', loopCount);
+            localStorage.setItem('cell_sk_grow', skills.grow.lvl);
+            localStorage.setItem('cell_sk_double', skills.double.lvl);
+            localStorage.setItem('cell_sk_burst', skills.burst.lvl);
+            localStorage.setItem('cell_nutrient_lvl', nutrientLevel);
+            localStorage.setItem('cell_culture_lvl', cultureFluidLevel);
+        }
+
+        // ★ 2: プレステージ画面（神経系グラフィック）の描画ロジック
+        function drawPrestigeScreen() {
+            pCtx.fillStyle = '#04040a';
+            pCtx.fillRect(0, 0, pCanvas.width, pCanvas.height);
+
+            const centerX = pCanvas.width / 2 + 100;
+            const centerY = pCanvas.height / 2;
+
+            // 背景の神経パルス演出（ランダムに細い線を明滅させる）
+            pCtx.strokeStyle = 'rgba(0, 229, 255, 0.03)';
+            pCtx.lineWidth = 1;
+            for(let i=0; i<5; i++) {
+                pCtx.beginPath();
+                pCtx.moveTo(centerX, centerY);
+                pCtx.lineTo(centerX + (Math.random()-0.5)*600, centerY + (Math.random()-0.5)*600);
+                pCtx.stroke();
+            }
+
+            // シナプス（神経細胞同士を繋ぐ線）の描画
+            pCtx.lineWidth = 2;
+            Object.values(skills).forEach(node => {
+                pCtx.beginPath();
+                pCtx.moveTo(centerX, centerY); // 中心核から各神経へ伸びる
+                pCtx.lineTo(node.x, node.y);
+                
+                if (node.lvl > 0) {
+                    pCtx.strokeStyle = 'rgba(224, 64, 251, 0.6)'; // 活性化時は紫
+                    pCtx.shadowBlur = 10; pCtx.shadowColor = '#e040fb';
+                } else {
+                    pCtx.strokeStyle = 'rgba(0, 229, 255, 0.2)'; // 未活性は青
+                    pCtx.shadowBlur = 0;
                 }
-                lastAutoGrowTime = now;
-                countDisplay.innerText = cells.length;
-            } else if (isStocking) {
-                lastAutoGrowTime = now; // 瓶詰め中は自動生成タイマーを一時停止
-            }
+                pCtx.stroke();
+            });
+            pCtx.shadowBlur = 0; // シャドウリセット
 
-            if (!isStocking && cells.length >= MAX_CELLS) {
-                isStocking = true;
-                updateShopUI(); // 瓶詰め開始時にショップを無効化
-            }
+            // 中心核（ニューロンの核細胞）の描画
+            let pulse = Math.sin(performance.now() / 200) * 3;
+            pCtx.beginPath();
+            pCtx.arc(centerX, centerY, 20 + pulse, 0, Math.PI * 2);
+            pCtx.fillStyle = '#00e5ff';
+            pCtx.shadowBlur = 15; pCtx.shadowColor = '#00e5ff';
+            pCtx.fill();
+            pCtx.shadowBlur = 0;
 
-            drawJar();
+            // 各スキルノードの球体描画
+            Object.values(skills).forEach(node => {
+                const isSelected = (selectedNodeId === node.id);
+                
+                // 外側の生体シールド（円環）
+                pCtx.beginPath();
+                pCtx.arc(node.x, node.y, 25, 0, Math.PI * 2);
+                pCtx.strokeStyle = isSelected ? '#fff' : (node.lvl > 0 ? '#e040fb' : '#445');
+                pCtx.lineWidth = isSelected ? 3 : 1.5;
+                pCtx.stroke();
 
-            if (!isStocking) {
-                for (let i = 0; i < cells.length; i++) {
-                    for (let j = i + 1; j < cells.length; j++) {
-                        const dx = cells[j].x - cells[i].x;
-                        const dy = cells[j].y - cells[i].y;
-                        const distance = Math.sqrt(dx * dx + dy * dy);
-                        const minDistance = cells[i].radius + cells[j].radius;
+                // 内側のコア（神経物質）
+                pCtx.beginPath();
+                pCtx.arc(node.x, node.y, 14, 0, Math.PI * 2);
+                if (node.lvl >= node.max) {
+                    pCtx.fillStyle = '#fff'; // マックス強化は白発光
+                } else if (node.lvl > 0) {
+                    pCtx.fillStyle = '#e040fb'; // 強化済みは紫
+                } else {
+                    pCtx.fillStyle = '#151525'; // 未強化は黒
+                }
+                pCtx.fill();
+                
+                // テキスト表記
+                pCtx.fillStyle = '#fff';
+                pCtx.font = '11px Courier New';
+                pCtx.textAlign = 'center';
+                pCtx.fillText(`Lv.${node.lvl}`, node.x, node.y + 4);
+            });
+        }
 
-                        if (distance < minDistance) {
-                            const angle = Math.atan2(dy, dx);
-                            const force = (minDistance - distance) * 0.08; 
-                            cells[i].vx -= Math.cos(angle) * force;
-                            cells[i].vy -= Math.sin(angle) * force;
-                            cells[j].vx += Math.cos(angle) * force;
-                            cells[j].vy += Math.sin(angle) * force;
+        // メインループ
+        function animate() {
+            if (currentScreen === 'main') {
+                ctx.fillStyle = isStocking ? 'rgba(10, 10, 10, 0.3)' : 'rgba(17, 17, 17, 1)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                const now = performance.now();
+                if (!isStocking && cultureFluidLevel > 0 && now - lastAutoGrowTime >= 1000) {
+                    let spawnCount = Math.min(cultureFluidLevel, MAX_CELLS - cells.length);
+                    if (skills.burst.lvl > 0 && Math.random() < 0.1) {
+                        spawnCount = Math.min(spawnCount * 3, MAX_CELLS - cells.length);
+                        ctx.fillStyle = 'rgba(0, 229, 255, 0.1)'; ctx.fillRect(0,0,canvas.width,canvas.height);
+                    }
+                    for (let i = 0; i < spawnCount; i++) {
+                        let spawnX = canvas.width / 2; let spawnY = canvas.height / 2; let baseH = 333;
+                        if (cells.length > 0) {
+                            const randomCell = cells[Math.floor(Math.random() * cells.length)];
+                            spawnX = randomCell.x + (Math.random() - 0.5) * 30; spawnY = randomCell.y + (Math.random() - 0.5) * 30; baseH = randomCell.h;
+                        }
+                        const nextH = (baseH + (Math.random() - 0.5) * 30) % 360;
+                        const speed = 2; const angle = Math.random() * Math.PI * 2;
+                        cells.push(new Cell(spawnX, spawnY, 28, nextH, 100, 75, Math.cos(angle) * speed, Math.sin(angle) * speed));
+                    }
+                    lastAutoGrowTime = now; countDisplay.innerText = cells.length;
+                } else if (isStocking) { lastAutoGrowTime = now; }
+
+                if (!isStocking && cells.length >= MAX_CELLS) { isStocking = true; updateShopUI(); }
+                drawJar();
+
+                if (!isStocking) {
+                    for (let i = 0; i < cells.length; i++) {
+                        for (let j = i + 1; j < cells.length; j++) {
+                            const dx = cells[j].x - cells[i].x; const dy = cells[j].y - cells[i].y;
+                            const distance = Math.sqrt(dx * dx + dy * dy); const minDistance = cells[i].radius + cells[j].radius;
+                            if (distance < minDistance) {
+                                const angle = Math.atan2(dy, dx); const force = (minDistance - distance) * 0.08; 
+                                cells[i].vx -= Math.cos(angle) * force; cells[i].vy -= Math.sin(angle) * force;
+                                cells[j].vx += Math.cos(angle) * force; cells[j].vy += Math.sin(angle) * force;
+                            }
                         }
                     }
                 }
-            }
-
-            cells.forEach(cell => {
-                cell.update();
-                cell.draw();
-            });
-
-            if (isStocking) {
-                cells = cells.filter(cell => !cell.markedForRemoval);
-                countDisplay.innerText = cells.length; 
-
-                if (cells.length === 0 && isStocking) {
-                    resetGame();
+                cells.forEach(cell => { cell.update(); cell.draw(); });
+                if (isStocking) {
+                    cells = cells.filter(cell => !cell.markedForRemoval); countDisplay.innerText = cells.length; 
+                    if (cells.length === 0 && isStocking) { resetGame(); }
                 }
+            } else {
+                // プレステージ画面のアニメーション
+                drawPrestigeScreen();
             }
-
             requestAnimationFrame(animate);
         }
 
-        // ★ UI（ショップなど）をクリックしたときに後ろの画面が反応するのを防ぐ
-        document.getElementById('ui').addEventListener('mousedown', (e) => {
-            e.stopPropagation();
+        // --- ★ 1: 画面遷移イベントの設定 ---
+        document.getElementById('go-prestige-btn').addEventListener('click', () => {
+            currentScreen = 'prestige';
+            mainScreen.style.display = 'none';
+            prestigeScreen.style.display = 'block';
+            selectedNodeId = null;
+            detailPanel.style.display = 'none';
+            initNodePositions();
+            updatePrestigeUI();
         });
 
-        // ★ 栄養剤の購入処理
+        document.getElementById('back-to-main-btn').addEventListener('click', () => {
+            currentScreen = 'main';
+            mainScreen.style.display = 'block';
+            prestigeScreen.style.display = 'none';
+        });
+
+        // パネルUIでのクリック貫通防止
+        document.getElementById('main-ui').addEventListener('mousedown', (e) => e.stopPropagation());
+        document.getElementById('prestige-ui-top').addEventListener('mousedown', (e) => e.stopPropagation());
+        document.getElementById('node-detail-panel').addEventListener('mousedown', (e) => e.stopPropagation());
+
+        // ショップ購入
         document.getElementById('buy-nutrient').addEventListener('click', () => {
             if (stockedJars >= nutrientCost && !isStocking) {
-                stockedJars -= nutrientCost;
-                nutrientLevel++;
-                localStorage.setItem('cell_jars', stockedJars);
-                localStorage.setItem('cell_nutrient_lvl', nutrientLevel);
-                jarDisplay.innerText = stockedJars;
-                updateShopUI();
+                stockedJars -= nutrientCost; nutrientLevel++; saveToLocalStorage(); jarDisplay.innerText = stockedJars; updateShopUI();
             }
         });
-
-        // ★ 培養液の購入処理
         document.getElementById('buy-culture').addEventListener('click', () => {
             if (stockedJars >= cultureFluidCost && !isStocking) {
-                stockedJars -= cultureFluidCost;
-                cultureFluidLevel++;
-                localStorage.setItem('cell_jars', stockedJars);
-                localStorage.setItem('cell_culture_lvl', cultureFluidLevel);
-                jarDisplay.innerText = stockedJars;
-                updateShopUI();
+                stockedJars -= cultureFluidCost; cultureFluidLevel++; saveToLocalStorage(); jarDisplay.innerText = stockedJars; updateShopUI();
             }
         });
 
+        // 転生実行
+        prestigeBtn.addEventListener('click', () => {
+            if(confirm("遺伝子転生を行いますか？\n進捗はリセットされ、次の周回難易度が上がります。")) {
+                triggerPrestige();
+            }
+        });
+
+        // ノード強化実行
+        nodeUpgradeBtn.addEventListener('click', () => {
+            if (!selectedNodeId) return;
+            const node = skills[selectedNodeId];
+            if (prestigePoints >= node.cost && node.lvl < node.max) {
+                prestigePoints -= node.cost;
+                node.lvl++;
+                saveToLocalStorage();
+                updatePrestigeUI();
+            }
+        });
+
+        // 通常クリック（細胞分裂）
         canvas.addEventListener('mousedown', (e) => {
             if (isStocking) return;
-            let splitOccurred = false;
             for (let i = cells.length - 1; i >= 0; i--) {
                 if (cells[i].isGrowing) continue;
-
-                const dx = e.clientX - cells[i].x;
-                const dy = e.clientY - cells[i].y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-
+                const dx = e.clientX - cells[i].x; const dy = e.clientY - cells[i].y; const dist = Math.sqrt(dx * dx + dy * dy);
                 if (dist < cells[i].radius && cells.length < MAX_CELLS) {
-                    const newCells = cells[i].split();
-                    cells.splice(i, 1, ...newCells);
-                    splitOccurred = true;
-                    break;
+                    const newCells = cells[i].split(); cells.splice(i, 1, ...newCells); break;
                 }
             }
             countDisplay.innerText = cells.length;
         });
 
+        // ★ 神経系画面でのノード選択クリック判定
+        pCanvas.addEventListener('mousedown', (e) => {
+            if (currentScreen !== 'prestige') return;
+            
+            let clickedNode = null;
+            Object.values(skills).forEach(node => {
+                const dx = e.clientX - node.x;
+                const dy = e.clientY - node.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                if (dist < 25) { // ノードの判定サイズ
+                    clickedNode = node.id;
+                }
+            });
+
+            if (clickedNode) {
+                selectedNodeId = clickedNode;
+                detailPanel.style.display = 'block';
+            } else {
+                selectedNodeId = null;
+                detailPanel.style.display = 'none';
+            }
+            updatePrestigeUI();
+        });
+
         function initGame() {
-            // セーブデータの復元（ショップレベルも含む）
-            const savedJars = localStorage.getItem('cell_jars');
-            if (savedJars) stockedJars = parseInt(savedJars);
+            if (localStorage.getItem('cell_jars')) stockedJars = parseInt(localStorage.getItem('cell_jars'));
+            if (localStorage.getItem('cell_total_jars')) totalJars = parseInt(localStorage.getItem('cell_total_jars'));
+            if (localStorage.getItem('cell_tp')) prestigePoints = parseInt(localStorage.getItem('cell_tp'));
+            if (localStorage.getItem('cell_loop')) loopCount = parseInt(localStorage.getItem('cell_loop'));
+            if (localStorage.getItem('cell_sk_grow')) skills.grow.lvl = parseInt(localStorage.getItem('cell_sk_grow'));
+            if (localStorage.getItem('cell_sk_double')) skills.double.lvl = parseInt(localStorage.getItem('cell_sk_double'));
+            if (localStorage.getItem('cell_sk_burst')) skills.burst.lvl = parseInt(localStorage.getItem('cell_sk_burst'));
+            if (localStorage.getItem('cell_nutrient_lvl')) nutrientLevel = parseInt(localStorage.getItem('cell_nutrient_lvl'));
+            if (localStorage.getItem('cell_culture_lvl')) cultureFluidLevel = parseInt(localStorage.getItem('cell_culture_lvl'));
+
+            MAX_CELLS = 200 + loopCount * 50;
+            maxCountDisplay.innerText = MAX_CELLS;
             jarDisplay.innerText = stockedJars;
+            conditionText.innerText = `${MAX_CELLS}個に達すると瓶詰めされます`;
 
-            const savedNutrient = localStorage.getItem('cell_nutrient_lvl');
-            if (savedNutrient) nutrientLevel = parseInt(savedNutrient);
-
-            const savedCulture = localStorage.getItem('cell_culture_lvl');
-            if (savedCulture) cultureFluidLevel = parseInt(savedCulture);
-
+            initNodePositions();
             updateShopUI();
+            updatePrestigeUI();
 
             cells = []; 
             cells.push(new Cell(canvas.width / 2, canvas.height / 2, 28, 333, 100, 75, 0, 0));
@@ -409,10 +592,10 @@
         animate();
 
         window.addEventListener('resize', () => {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            jarPos.x = canvas.width - 100;
-            jarPos.y = canvas.height - 120;
+            canvas.width = pCanvas.width = window.innerWidth;
+            canvas.height = pCanvas.height = window.innerHeight;
+            jarPos.x = canvas.width - 100; jarPos.y = canvas.height - 120;
+            initNodePositions();
         });
     </script>
 </body>
