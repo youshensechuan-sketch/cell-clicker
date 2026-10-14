@@ -64,12 +64,8 @@ body { margin: 0; overflow: hidden; background-color: #050508; font-family: 'Cou
             border-radius: 4px; cursor: pointer; font-family: inherit; width: 100%; margin-top: 10px;
         }
         .back-btn:hover { color: #fff; background: #333; }
-        #mutation-hud { position:absolute; right:18px; top:18px; z-index:12; width:245px; padding:12px; border:1px solid #398c8c; border-radius:9px; color:#e8ffff; background:rgba(4,14,22,.88); font-size:12px; pointer-events:none; }
-        #mutation-hud strong { color:#80faff; font-size:14px; }
-        .mutation-help { color:#abc; margin-top:4px; }
-        #mutation-effects { white-space:pre-line; margin-top:7px; line-height:1.65; }
         #mutation-toast { position:absolute; left:50%; top:19%; transform:translateX(-50%); z-index:30; color:white; font-weight:bold; text-align:center; pointer-events:none; text-shadow:0 2px 8px #000; font-size:19px; opacity:0; transition:opacity .2s; padding:12px; border-radius:12px; background:rgba(2,8,15,.78); max-width:70vw; }
         .tp-value { color:#00e5ff; }
         .next-tp-info { font-size:10px; color:#aaa; margin: 5px 0; }
-        @media(max-width:680px) { #mutation-hud {top:auto;bottom:15px;right:10px;width:180px;font-size:10px;} #mutation-toast {font-size:15px;} }
+        @media(max-width:680px) { #mutation-toast {font-size:15px;} }
 

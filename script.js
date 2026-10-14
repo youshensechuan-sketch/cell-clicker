@@ -89,6 +89,10 @@
             capacity3: { id: 'capacity3', name: '柔軟な培養槽 III', desc: '瓶詰めに必要な細胞数を合計30%減らす。', lvl: 0, max: 1, cost: 190, requires: ['capacity2'], gx: 3, gy: 1, x: 0, y: 0 },
             mutation1: { id: 'mutation1', name: '突然変異 I', desc: '自動増殖で20%の確率で追加1個を生成。', lvl: 0, max: 1, cost: 18, requires: ['burst'], gx: -2, gy: 0, x: 0, y: 0 },
             mutation2: { id: 'mutation2', name: '突然変異 II', desc: '自動増殖で35%の確率で追加3個を生成。', lvl: 0, max: 1, cost: 70, requires: ['mutation1'], gx: -3, gy: 0, x: 0, y: 0 },
+            mutationSignal: { id: 'mutationSignal', name: '変異誘導', desc: 'クリック突然変異の発生率 +2.5% / Lv。', lvl: 0, max: 3, cost: 25, requires: ['mutation2'], gx: -4, gy: 0, x: 0, y: 0 },
+            mutationStasis: { id: 'mutationStasis', name: '変異保全', desc: '突然変異細胞が消えるまでの時間 +8秒 / Lv。', lvl: 0, max: 2, cost: 55, requires: ['mutationSignal'], gx: -5, gy: 0, x: 0, y: 0 },
+            mutationCulture: { id: 'mutationCulture', name: '変異培養皿', desc: '同時に存在できる突然変異細胞 +1 / Lv。', lvl: 0, max: 2, cost: 60, requires: ['mutationSignal'], gx: -4, gy: 1, x: 0, y: 0 },
+            mutationFilter: { id: 'mutationFilter', name: '変異選別', desc: '悪性の突然変異効果を50%の確率で良性効果に置き換える。', lvl: 0, max: 1, cost: 140, requires: ['mutationStasis', 'mutationCulture'], gx: -5, gy: 1, x: 0, y: 0 },
             bonus1: { id: 'bonus1', name: '共生作用', desc: 'クリック分裂と自動増殖の追加生成数が1.5倍。', lvl: 0, max: 1, cost: 100, requires: ['click2', 'auto2'], gx: 2, gy: -3, x: 0, y: 0 },
             bonus2: { id: 'bonus2', name: '完全共生', desc: 'クリック分裂と自動増殖の追加生成数が2倍。', lvl: 0, max: 1, cost: 350, requires: ['bonus1'], gx: 3, gy: -3, x: 0, y: 0 }
         };
@@ -161,16 +165,22 @@
         const mutationParticles = [];
         let mutationToastUntil = 0;
         function randomItem(items) { return items[Math.floor(Math.random()*items.length)]; }
-        function modifier(id) { return (mutationEffects[id] || 0) > Date.now(); }
-        function clearMutationEffects() { Object.keys(mutationEffects).forEach(k => delete mutationEffects[k]); mutationParticles.length=0; updateMutationHud(); }
-        function updateMutationHud() {
-            const active = [
-                ['fertile','分裂数 +3'],['reach','クリック範囲 ×2.2'],
-                ['frenzy','分裂数 ×2'],['plague','分裂数 ×0.5'],
-                ['shrink','クリック範囲 ×0.55']
-            ].filter(([id])=>modifier(id));
-            document.getElementById('mutation-effects').textContent = active.length ? active.map(([id,label])=>`${label}（残り${Math.ceil((mutationEffects[id]-Date.now())/1000)}秒）`).join('\n') : '現在の効果: なし';
+        function mutationChance() { return MUTATION_CHANCE + skills.mutationSignal.lvl * 0.025; }
+        function mutationLifetime() { return MUTATION_LIFETIME + skills.mutationStasis.lvl * 8000; }
+        function maxMutationCells() { return 3 + skills.mutationCulture.lvl; }
+        function pickMutationEffect() {
+            return randomItem(MUTATION_EFFECTS);
         }
+        function resolveMutationEffect(effect) {
+            const finalEffects=MUTATION_EFFECTS.filter(m=>m.id!=='wild');
+            const resolved=effect.id==='wild' ? randomItem(finalEffects) : effect;
+            if(hasSkill('mutationFilter') && resolved.kind==='bad' && Math.random()<0.5) {
+                return randomItem(MUTATION_EFFECTS.filter(m=>m.kind==='good'));
+            }
+            return resolved;
+        }
+        function modifier(id) { return (mutationEffects[id] || 0) > Date.now(); }
+        function clearMutationEffects() { Object.keys(mutationEffects).forEach(k => delete mutationEffects[k]); mutationParticles.length=0; }
         function showMutationToast(message,color='#9ff') {
             const el=document.getElementById('mutation-toast');
             el.textContent=message; el.style.color=color; el.style.opacity='1'; mutationToastUntil=performance.now()+2600;
@@ -180,8 +190,8 @@
                 mutationParticles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:42,color});}
         }
         function pickMutation(cell) {
-            if (Math.random()>=MUTATION_CHANCE || cells.filter(c=>c.mutation).length>=3) return;
-            const effect=randomItem(MUTATION_EFFECTS);
+            if (Math.random()>=mutationChance() || cells.filter(c=>c.mutation).length>=maxMutationCells()) return;
+            const effect=pickMutationEffect();
             const visual=randomItem(MUTATION_VISUALS);
             cell.mutation=effect.id;
             cell.mutationVisual={...visual,phase:Math.random()*Math.PI*2};
@@ -191,8 +201,7 @@
         function collectMutation(cell) {
             const original=MUTATION_EFFECTS.find(m=>m.id===cell.mutation);
             if(!original)return;
-            const finalEffects=MUTATION_EFFECTS.filter(m=>m.id!=='wild');
-            const type=original.id==='wild' ? randomItem(finalEffects) : original;
+            const type=resolveMutationEffect(original);
             const visual=cell.mutationVisual || randomItem(MUTATION_VISUALS);
             mutationBurst(cell.x,cell.y,visual.primary);
             if (type.id==='gift') addJarReward(2);
@@ -205,7 +214,6 @@
                 mutationEffects[type.id]=Date.now()+seconds*1000;
             }
             if(type.id!=='drain')showMutationToast(`🧬 ${original.name} → ${type.name}！ ${type.desc}`,visual.primary);
-            updateMutationHud();
         }
         function drawMutationParticles() {
             for(let i=mutationParticles.length-1;i>=0;i--){const p=mutationParticles[i];p.x+=p.vx;p.y+=p.vy;p.vx*=.97;p.vy*=.97;p.life--;
@@ -285,8 +293,6 @@
             ctx.shadowBlur=0;ctx.fillStyle='#091018';ctx.font='bold 18px Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(v.symbol,cell.x,cell.y);
             ctx.restore();
         }
-        let hudTick=0;
-
         // --- 細胞オブジェクト ---
         class Cell {
             constructor(x, y, radius, h, s, l, vx, vy) {
@@ -322,7 +328,7 @@
                     } else { this.markedForRemoval = true; }
                     return; 
                 }
-                if(this.mutation && performance.now()-this.mutationBorn > MUTATION_LIFETIME){
+                if(this.mutation && performance.now()-this.mutationBorn > mutationLifetime()){
                     this.mutation=null;this.mutationVisual=null;this.color=getHslString(this.h,this.s,this.l);
                 }
                 this.x += this.vx; this.y += this.vy; this.vx *= this.friction; this.vy *= this.friction;
@@ -541,7 +547,6 @@
                 }
                 cells.forEach(cell => { cell.update(); cell.draw(); });
                 drawMutationParticles();
-                if(performance.now()-hudTick>250){hudTick=performance.now();updateMutationHud();}
                 if(performance.now()>mutationToastUntil)document.getElementById('mutation-toast').style.opacity='0';
                 if (isStocking) {
                     cells = cells.filter(cell => !cell.markedForRemoval); countDisplay.innerText = cells.length; 
