@@ -133,26 +133,41 @@
         // 突然変異は「クリックによって新規生成された細胞」にのみ付与する。
         const MUTATION_CHANCE = 0.055; // クリック1回につき5.5%（対象は分裂した子細胞のみ）
         const MUTATION_LIFETIME = 22000;
-        const MUTATION_TYPES = [
-            {id:'fertile',name:'増殖核',color:'#64ff8b',symbol:'✦',kind:'good',desc:'25秒間、クリック分裂の生成数 +3'},
-            {id:'reach',name:'感覚拡張',color:'#58eaff',symbol:'◎',kind:'good',desc:'30秒間、クリック判定半径が2.2倍'},
-            {id:'frenzy',name:'過剰分裂',color:'#ffdd55',symbol:'✳',kind:'good',desc:'12秒間、クリック分裂で生成される細胞が2倍'},
-            {id:'gift',name:'栄養結晶',color:'#d998ff',symbol:'◆',kind:'good',desc:'瓶を即座に2個獲得'},
-            {id:'plague',name:'細胞毒',color:'#ff547b',symbol:'☣',kind:'bad',desc:'15秒間、クリック分裂で生成される細胞が半分（最低2個）'},
-            {id:'shrink',name:'神経萎縮',color:'#ff8a45',symbol:'⊗',kind:'bad',desc:'20秒間、クリック判定半径が0.55倍'},
-            {id:'drain',name:'資源汚染',color:'#b37bff',symbol:'☠',kind:'bad',desc:'所持している瓶の20%を失う（最大15個）'},
-            {id:'wild',name:'不安定核',color:'#fff',symbol:'?',kind:'wild',desc:'良い効果か悪い効果がランダムで発生'}
+        const MUTATION_EFFECTS = [
+            {id:'fertile',name:'増殖核',kind:'good',desc:'25秒間、クリック分裂の生成数 +3'},
+            {id:'reach',name:'感覚拡張',kind:'good',desc:'30秒間、クリック判定半径が2.2倍'},
+            {id:'frenzy',name:'過剰分裂',kind:'good',desc:'12秒間、クリック分裂で生成される細胞が2倍'},
+            {id:'gift',name:'栄養結晶',kind:'good',desc:'瓶を即座に2個獲得'},
+            {id:'plague',name:'細胞毒',kind:'bad',desc:'15秒間、クリック分裂で生成される細胞が半分（最低2個）'},
+            {id:'shrink',name:'神経萎縮',kind:'bad',desc:'20秒間、クリック判定半径が0.55倍'},
+            {id:'drain',name:'資源汚染',kind:'bad',desc:'所持している瓶の20%を失う（最大15個）'},
+            {id:'wild',name:'不安定核',kind:'wild',desc:'良い効果か悪い効果がランダムで発生'}
+        ];
+        const MUTATION_VISUALS = [
+            {shape:'orbit',primary:'#64ff8b',secondary:'#eafff0',symbol:'✦',orbs:4,spin:.8},
+            {shape:'halo',primary:'#58eaff',secondary:'#2038ff',symbol:'◎',orbs:0,spin:.4},
+            {shape:'spikes',primary:'#ffdd55',secondary:'#ff7a18',symbol:'✳',orbs:8,spin:1.25},
+            {shape:'diamond',primary:'#d998ff',secondary:'#72f7ff',symbol:'◆',orbs:4,spin:-.65},
+            {shape:'scan',primary:'#ff547b',secondary:'#ffe2ea',symbol:'☣',orbs:2,spin:.95},
+            {shape:'cross',primary:'#ff8a45',secondary:'#ffd4a6',symbol:'⊗',orbs:6,spin:-1.05},
+            {shape:'rings',primary:'#b37bff',secondary:'#fff5a8',symbol:'☠',orbs:3,spin:.55},
+            {shape:'petals',primary:'#ffffff',secondary:'#79ffca',symbol:'?',orbs:7,spin:1.45},
+            {shape:'triangle',primary:'#ff6ef3',secondary:'#52fffc',symbol:'△',orbs:3,spin:-.9},
+            {shape:'square',primary:'#9eff5a',secondary:'#fffb5c',symbol:'□',orbs:4,spin:.7},
+            {shape:'comet',primary:'#ffa6e8',secondary:'#7afff5',symbol:'✧',orbs:5,spin:1.7},
+            {shape:'eye',primary:'#f5ff6b',secondary:'#ff6b6b',symbol:'◉',orbs:0,spin:.35}
         ];
         const mutationEffects = {}; // id -> 終了時刻。転生時はリセット
         const mutationParticles = [];
         let mutationToastUntil = 0;
+        function randomItem(items) { return items[Math.floor(Math.random()*items.length)]; }
         function modifier(id) { return (mutationEffects[id] || 0) > Date.now(); }
         function clearMutationEffects() { Object.keys(mutationEffects).forEach(k => delete mutationEffects[k]); mutationParticles.length=0; updateMutationHud(); }
         function updateMutationHud() {
             const active = [
-                ['fertile','🟢 分裂数 +3'],['reach','🔵 クリック範囲 ×2.2'],
-                ['frenzy','🟡 分裂数 ×2'],['plague','🔴 分裂数 ×0.5'],
-                ['shrink','🟠 クリック範囲 ×0.55']
+                ['fertile','分裂数 +3'],['reach','クリック範囲 ×2.2'],
+                ['frenzy','分裂数 ×2'],['plague','分裂数 ×0.5'],
+                ['shrink','クリック範囲 ×0.55']
             ].filter(([id])=>modifier(id));
             document.getElementById('mutation-effects').textContent = active.length ? active.map(([id,label])=>`${label}（残り${Math.ceil((mutationEffects[id]-Date.now())/1000)}秒）`).join('\n') : '現在の効果: なし';
         }
@@ -166,26 +181,30 @@
         }
         function pickMutation(cell) {
             if (Math.random()>=MUTATION_CHANCE || cells.filter(c=>c.mutation).length>=3) return;
-            const type=MUTATION_TYPES[Math.floor(Math.random()*MUTATION_TYPES.length)];
-            cell.mutation=type.id;
+            const effect=randomItem(MUTATION_EFFECTS);
+            const visual=randomItem(MUTATION_VISUALS);
+            cell.mutation=effect.id;
+            cell.mutationVisual={...visual,phase:Math.random()*Math.PI*2};
             cell.mutationBorn=performance.now();
-            cell.h=0; cell.color=type.color;
+            cell.color=visual.primary;
         }
         function collectMutation(cell) {
-            const original=MUTATION_TYPES.find(m=>m.id===cell.mutation);
+            const original=MUTATION_EFFECTS.find(m=>m.id===cell.mutation);
             if(!original)return;
-            const type=original.id==='wild' ? MUTATION_TYPES[Math.floor(Math.random()*(MUTATION_TYPES.length-1))] : original;
-            mutationBurst(cell.x,cell.y,original.color);
+            const finalEffects=MUTATION_EFFECTS.filter(m=>m.id!=='wild');
+            const type=original.id==='wild' ? randomItem(finalEffects) : original;
+            const visual=cell.mutationVisual || randomItem(MUTATION_VISUALS);
+            mutationBurst(cell.x,cell.y,visual.primary);
             if (type.id==='gift') addJarReward(2);
             else if (type.id==='drain') {
                 const lost=Math.min(15,Math.ceil(stockedJars*.2)); stockedJars-=lost;
                 jarDisplay.textContent=stockedJars; updateShopUI();saveToLocalStorage();
-                showMutationToast(`☠ ${original.name} → ${type.name}: 瓶 -${lost}個`,type.color);
+                showMutationToast(`🧬 ${original.name} → ${type.name}: 瓶 -${lost}個`,visual.primary);
             } else {
                 const seconds={fertile:25,reach:30,frenzy:12,plague:15,shrink:20}[type.id];
                 mutationEffects[type.id]=Date.now()+seconds*1000;
             }
-            if(type.id!=='drain')showMutationToast(`🧬 ${original.name} → ${type.name}！ ${type.desc}`,type.color);
+            if(type.id!=='drain')showMutationToast(`🧬 ${original.name} → ${type.name}！ ${type.desc}`,visual.primary);
             updateMutationHud();
         }
         function drawMutationParticles() {
@@ -193,6 +212,78 @@
                 ctx.globalAlpha=Math.max(0,p.life/42);ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,2.5,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
                 if(p.life<=0)mutationParticles.splice(i,1);
             }
+        }
+        function drawMutationVisual(cell) {
+            const v=cell.mutationVisual || MUTATION_VISUALS[0];
+            const t=performance.now()/300 + v.phase;
+            const pulse=7+Math.sin(t)*3;
+            const outer=cell.radius+pulse;
+            ctx.save();
+            ctx.shadowColor=v.primary; ctx.shadowBlur=22;
+            ctx.strokeStyle=v.primary; ctx.fillStyle=v.primary; ctx.lineWidth=3;
+
+            if(v.shape==='spikes'){
+                ctx.beginPath();
+                for(let k=0;k<18;k++){
+                    const a=t*.35+k*Math.PI/9;
+                    const r=cell.radius+(k%2?8:18);
+                    const x=cell.x+Math.cos(a)*r, y=cell.y+Math.sin(a)*r;
+                    if(k===0)ctx.moveTo(x,y); else ctx.lineTo(x,y);
+                }
+                ctx.closePath(); ctx.stroke();
+            } else if(v.shape==='diamond'){
+                ctx.save(); ctx.translate(cell.x,cell.y); ctx.rotate(t*.45);
+                ctx.strokeRect(-outer*.72,-outer*.72,outer*1.44,outer*1.44);
+                ctx.restore();
+            } else if(v.shape==='scan'){
+                ctx.beginPath(); ctx.arc(cell.x,cell.y,outer,0,Math.PI*2); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(cell.x-outer,cell.y+Math.sin(t*3)*outer*.55);
+                ctx.lineTo(cell.x+outer,cell.y+Math.sin(t*3)*outer*.55); ctx.stroke();
+            } else if(v.shape==='cross'){
+                for(let k=0;k<4;k++){
+                    const a=t*.4+k*Math.PI/2;
+                    ctx.beginPath(); ctx.moveTo(cell.x+Math.cos(a)*(cell.radius+4),cell.y+Math.sin(a)*(cell.radius+4));
+                    ctx.lineTo(cell.x+Math.cos(a)*(cell.radius+22),cell.y+Math.sin(a)*(cell.radius+22)); ctx.stroke();
+                }
+            } else if(v.shape==='rings'){
+                for(let k=0;k<3;k++){ctx.globalAlpha=.85-k*.2;ctx.beginPath();ctx.arc(cell.x,cell.y,cell.radius+6+k*7+Math.sin(t+k)*2,0,Math.PI*2);ctx.stroke();}
+                ctx.globalAlpha=1;
+            } else if(v.shape==='petals'){
+                for(let k=0;k<7;k++){
+                    const a=t*.5+k*Math.PI*2/7;
+                    ctx.beginPath();ctx.ellipse(cell.x+Math.cos(a)*(cell.radius+9),cell.y+Math.sin(a)*(cell.radius+9),4,10,a,0,Math.PI*2);ctx.stroke();
+                }
+            } else if(v.shape==='triangle'){
+                ctx.save();ctx.translate(cell.x,cell.y);ctx.rotate(t*.5);
+                ctx.beginPath();
+                for(let k=0;k<3;k++){const a=-Math.PI/2+k*Math.PI*2/3; const x=Math.cos(a)*outer, y=Math.sin(a)*outer; if(k===0)ctx.moveTo(x,y); else ctx.lineTo(x,y);}
+                ctx.closePath();ctx.stroke();ctx.restore();
+            } else if(v.shape==='square'){
+                ctx.save();ctx.translate(cell.x,cell.y);ctx.rotate(t*.45);
+                ctx.strokeRect(-outer*.62,-outer*.62,outer*1.24,outer*1.24);
+                ctx.restore();
+                ctx.beginPath();ctx.arc(cell.x,cell.y,outer*.72,0,Math.PI*2);ctx.stroke();
+            } else if(v.shape==='comet'){
+                ctx.beginPath();ctx.arc(cell.x,cell.y,outer,0,Math.PI*2);ctx.stroke();
+                for(let k=0;k<3;k++){
+                    const a=t*.8+k*Math.PI*2/3;
+                    ctx.beginPath();ctx.moveTo(cell.x+Math.cos(a)*outer,cell.y+Math.sin(a)*outer);
+                    ctx.quadraticCurveTo(cell.x+Math.cos(a-.45)*(outer+20),cell.y+Math.sin(a-.45)*(outer+20),cell.x+Math.cos(a-.9)*(outer+5),cell.y+Math.sin(a-.9)*(outer+5));ctx.stroke();
+                }
+            } else if(v.shape==='eye'){
+                ctx.beginPath();ctx.ellipse(cell.x,cell.y,outer,outer*.55,Math.sin(t)*.25,0,Math.PI*2);ctx.stroke();
+                ctx.beginPath();ctx.arc(cell.x,cell.y,5+Math.sin(t*2)*2,0,Math.PI*2);ctx.fill();
+            } else {
+                ctx.beginPath();ctx.arc(cell.x,cell.y,outer,0,Math.PI*2);ctx.stroke();
+            }
+
+            for(let k=0;k<(v.orbs||0);k++){
+                const a=t*v.spin+k*Math.PI*2/v.orbs;
+                ctx.beginPath();ctx.arc(cell.x+Math.cos(a)*(cell.radius+11),cell.y+Math.sin(a)*(cell.radius+11),3,0,Math.PI*2);
+                ctx.fillStyle=k%2?v.secondary:v.primary;ctx.fill();
+            }
+            ctx.shadowBlur=0;ctx.fillStyle='#091018';ctx.font='bold 18px Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(v.symbol,cell.x,cell.y);
+            ctx.restore();
         }
         let hudTick=0;
 
@@ -212,15 +303,7 @@
                 ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
                 ctx.fillStyle = this.color; ctx.fill();
                 if (this.mutation) {
-                    const m=MUTATION_TYPES.find(t=>t.id===this.mutation);
-                    const t=performance.now()/300;
-                    const pulse=7+Math.sin(t)*3;
-                    ctx.save();ctx.shadowColor=m.color;ctx.shadowBlur=22;
-                    ctx.strokeStyle=m.color;ctx.lineWidth=3;
-                    ctx.beginPath();ctx.arc(this.x,this.y,this.radius+pulse,0,Math.PI*2);ctx.stroke();
-                    for(let k=0;k<4;k++){const a=t*.7+k*Math.PI/2;
-                        ctx.beginPath();ctx.arc(this.x+Math.cos(a)*(this.radius+11),this.y+Math.sin(a)*(this.radius+11),3,0,Math.PI*2);ctx.fillStyle=m.color;ctx.fill();}
-                    ctx.shadowBlur=0;ctx.fillStyle='#091018';ctx.font='bold 18px Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(m.symbol,this.x,this.y);ctx.restore();
+                    drawMutationVisual(this);
                 }
                 if (this.isGrowing) {
                     ctx.beginPath(); ctx.arc(this.x, this.y, this.radius + 2, 0, Math.PI * 2);
@@ -240,7 +323,7 @@
                     return; 
                 }
                 if(this.mutation && performance.now()-this.mutationBorn > MUTATION_LIFETIME){
-                    this.mutation=null;this.color=getHslString(this.h,this.s,this.l);
+                    this.mutation=null;this.mutationVisual=null;this.color=getHslString(this.h,this.s,this.l);
                 }
                 this.x += this.vx; this.y += this.vy; this.vx *= this.friction; this.vy *= this.friction;
                 if (this.x - this.radius < 0) { this.x = this.radius; this.vx *= -1; }
@@ -530,15 +613,15 @@
             if (isStocking) return;
             for(const cell of cells){
                 if(cell.mutation && Math.hypot(e.clientX-cell.x,e.clientY-cell.y)<cell.radius+14){
-                    collectMutation(cell);cell.mutation=null;cell.h=333;cell.color=getHslString(cell.h,cell.s,cell.l);return;
+                    collectMutation(cell);cell.mutation=null;cell.mutationVisual=null;cell.color=getHslString(cell.h,cell.s,cell.l);return;
                 }
             }
             for (let i = cells.length - 1; i >= 0; i--) {
                 const dx = e.clientX - cells[i].x; const dy = e.clientY - cells[i].y; const dist = Math.sqrt(dx * dx + dy * dy);
                 // 突然変異細胞は成長途中でも回収可能。通常の細胞より優先して判定する。
                 if(cells[i].mutation && dist < cells[i].radius+14) {
-                    collectMutation(cells[i]); cells[i].mutation=null;
-                    cells[i].h=333;cells[i].color=getHslString(cells[i].h,cells[i].s,cells[i].l);
+                    collectMutation(cells[i]); cells[i].mutation=null;cells[i].mutationVisual=null;
+                    cells[i].color=getHslString(cells[i].h,cells[i].s,cells[i].l);
                     return;
                 }
                 if (cells[i].isGrowing) continue;
