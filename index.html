@@ -30,7 +30,11 @@
             
             <button id="go-prestige-btn" class="nav-btn">🧬 遺伝子研究所 (転生)</button>
         </div>
-        <button id="mobile-shop-toggle" type="button" aria-expanded="false" aria-controls="main-ui">情報・ショップを開く</button>
+        <div id="mobile-hud" aria-label="現在の培養状況">
+            <div class="mobile-stat"><span>細胞</span><strong id="mobile-count">0 / 200</strong></div>
+            <div class="mobile-stat"><span>瓶</span><strong id="mobile-jars">0</strong></div>
+            <button id="mobile-shop-toggle" type="button" aria-expanded="false" aria-controls="main-ui">ショップを開く</button>
+        </div>
         <canvas id="gameCanvas"></canvas>
         <div id="mutation-toast" role="status" aria-live="polite"></div>
     </div>

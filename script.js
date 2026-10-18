@@ -9,6 +9,8 @@
         const prestigeScreen = document.getElementById('prestige-screen');
         const mobileShopToggle = document.getElementById('mobile-shop-toggle');
         const mobileTreeInfoToggle = document.getElementById('mobile-tree-info-toggle');
+        const mobileCountDisplay = document.getElementById('mobile-count');
+        const mobileJarsDisplay = document.getElementById('mobile-jars');
         const mobileLayout = window.matchMedia('(max-width: 680px)');
         const isMobileLayout = () => mobileLayout.matches;
 
@@ -29,6 +31,16 @@
         const nextTpJarsDisplay = document.getElementById('next-tp-jars');
         const prestigeBtn = document.getElementById('prestige-trigger');
         const pendingTpDisplay = document.getElementById('pending-tp');
+
+        const mobileHudObserver = new MutationObserver(() => {
+            mobileCountDisplay.textContent = `${countDisplay.textContent} / ${maxCountDisplay.textContent}`;
+            mobileJarsDisplay.textContent = jarDisplay.textContent;
+        });
+        mobileHudObserver.observe(countDisplay, { childList: true, characterData: true, subtree: true });
+        mobileHudObserver.observe(maxCountDisplay, { childList: true, characterData: true, subtree: true });
+        mobileHudObserver.observe(jarDisplay, { childList: true, characterData: true, subtree: true });
+        mobileCountDisplay.textContent = `${countDisplay.textContent} / ${maxCountDisplay.textContent}`;
+        mobileJarsDisplay.textContent = jarDisplay.textContent;
         
         // ノード詳細UI
         const detailPanel = document.getElementById('node-detail-panel');
@@ -570,6 +582,9 @@
             currentScreen = 'prestige';
             mainScreen.style.display = 'none';
             prestigeScreen.style.display = 'block';
+            prestigeScreen.classList.remove('tree-info-open');
+            mobileTreeInfoToggle.setAttribute('aria-expanded', 'false');
+            mobileTreeInfoToggle.textContent = '転生情報を開く';
             selectedNodeId = null;
             detailPanel.style.display = 'none';
             initNodePositions();
@@ -667,7 +682,9 @@
             mainScreen.classList.remove('shop-open');
             prestigeScreen.classList.remove('tree-info-open');
             mobileShopToggle.setAttribute('aria-expanded', 'false');
+            mobileShopToggle.textContent = 'ショップを開く';
             mobileTreeInfoToggle.setAttribute('aria-expanded', 'false');
+            mobileTreeInfoToggle.textContent = '転生情報を開く';
         });
 
         // スキルツリーをドラッグ移動・ホイール/ピンチズーム・クリック選択
