@@ -2,13 +2,15 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#050508">
     <title>Cell Evolution Clicker</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
     <div id="main-screen">
-        <div id="main-ui" class="ui-panel">
+        <div id="main-ui" class="ui-panel" aria-label="培養室の情報とショップ">
             <h1>細胞数: <span id="count">0</span> / <span id="max-count">200</span></h1>
             <h2>瓶のストック: <span id="jar-count">0</span></h2>
             <p>細胞をクリックして分裂・進化させよう</p>
@@ -28,6 +30,7 @@
             
             <button id="go-prestige-btn" class="nav-btn">🧬 遺伝子研究所 (転生)</button>
         </div>
+        <button id="mobile-shop-toggle" type="button" aria-expanded="false" aria-controls="main-ui">情報・ショップを開く</button>
         <canvas id="gameCanvas"></canvas>
         <div id="mutation-toast" role="status" aria-live="polite"></div>
     </div>
@@ -44,6 +47,7 @@
             </button>
             <button id="back-to-main-btn" class="back-btn">← 培養室に戻る</button>
         </div>
+        <button id="mobile-tree-info-toggle" type="button" aria-expanded="false" aria-controls="prestige-ui-top">転生情報を開く</button>
 
         <div id="node-detail-panel" class="ui-panel">
             <h3 id="node-name">ノード名</h3>

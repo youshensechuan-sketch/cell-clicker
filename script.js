@@ -7,6 +7,10 @@
         // 画面要素
         const mainScreen = document.getElementById('main-screen');
         const prestigeScreen = document.getElementById('prestige-screen');
+        const mobileShopToggle = document.getElementById('mobile-shop-toggle');
+        const mobileTreeInfoToggle = document.getElementById('mobile-tree-info-toggle');
+        const mobileLayout = window.matchMedia('(max-width: 680px)');
+        const isMobileLayout = () => mobileLayout.matches;
 
         // UI表示用要素
         const countDisplay = document.getElementById('count');
@@ -117,8 +121,10 @@
         function pendingPrestigeTp() { return Math.max(0, calculateTotalTpFromJars(totalJars) - earnedTpLifetime); }
         function effectiveMaxCells() {
             const reduce = hasSkill('capacity3') ? .3 : hasSkill('capacity2') ? .2 : hasSkill('capacity1') ? .1 : 0;
-            return Math.max(40, Math.ceil((200 + loopCount * 50) * (1 - reduce)));
+            const base = isMobileLayout() ? Math.min(120, Math.max(60, Math.floor(canvas.width * canvas.height / 5200))) : 200 + loopCount * 50;
+            return Math.max(40, Math.ceil(base * (1 - reduce)));
         }
+        function cellBaseRadius() { return isMobileLayout() ? 38 : 28; }
         function updateCapacity() {
             MAX_CELLS = effectiveMaxCells();
             maxCountDisplay.textContent = MAX_CELLS;
@@ -425,7 +431,7 @@
             jarDisplay.innerText = stockedJars; countDisplay.innerText = 0;
             saveToLocalStorage(); updateShopUI(); updatePrestigeUI();
             const delay = hasSkill('packing') ? 80 : 1000;
-            setTimeout(() => { if (!isStocking && cells.length === 0) { cells.push(new Cell(canvas.width / 2, canvas.height / 2, 28, 333, 100, 75, 0, 0)); countDisplay.innerText = 1; } }, delay);
+            setTimeout(() => { if (!isStocking && cells.length === 0) { cells.push(new Cell(canvas.width / 2, canvas.height / 2, cellBaseRadius(), 333, 100, 75, 0, 0)); countDisplay.innerText = 1; } }, delay);
         }
 
         function triggerPrestige() {
@@ -444,7 +450,7 @@
             updateCapacity();
 
             saveToLocalStorage(); updateShopUI(); updatePrestigeUI();
-            cells.push(new Cell(canvas.width / 2, canvas.height / 2, 28, 333, 100, 75, 0, 0));
+            cells.push(new Cell(canvas.width / 2, canvas.height / 2, cellBaseRadius(), 333, 100, 75, 0, 0));
             countDisplay.innerText = 1;
         }
 
@@ -521,7 +527,7 @@
                         }
                         const nextH = (baseH + (Math.random() - 0.5) * 30) % 360;
                         const speed = 2; const angle = Math.random() * Math.PI * 2;
-                        cells.push(new Cell(spawnX, spawnY, 28, nextH, 100, 75, Math.cos(angle) * speed, Math.sin(angle) * speed));
+                        cells.push(new Cell(spawnX, spawnY, cellBaseRadius(), nextH, 100, 75, Math.cos(angle) * speed, Math.sin(angle) * speed));
                     }
                     lastAutoGrowTime = now; countDisplay.innerText = cells.length;
                 } else if (isStocking) { lastAutoGrowTime = now; }
@@ -614,7 +620,7 @@
         });
 
         // 通常クリック（細胞分裂）
-        canvas.addEventListener('mousedown', (e) => {
+        function handleCellTap(e) {
             if (isStocking) return;
             for(const cell of cells){
                 if(cell.mutation && Math.hypot(e.clientX-cell.x,e.clientY-cell.y)<cell.radius+14){
@@ -639,31 +645,79 @@
                 }
             }
             countDisplay.innerText = cells.length;
+        }
+        canvas.addEventListener('pointerdown', (e) => {
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
+            e.preventDefault();
+            handleCellTap(e);
         });
 
-        // スキルツリーをドラッグ移動・ホイールズーム・クリック選択
+        mainScreen.classList.toggle('shop-open', !isMobileLayout());
+        mobileShopToggle.addEventListener('click', () => {
+            const isOpen = mainScreen.classList.toggle('shop-open');
+            mobileShopToggle.setAttribute('aria-expanded', String(isOpen));
+            mobileShopToggle.textContent = isOpen ? 'ショップを閉じる' : '情報・ショップを開く';
+        });
+        mobileTreeInfoToggle.addEventListener('click', () => {
+            const isOpen = prestigeScreen.classList.toggle('tree-info-open');
+            mobileTreeInfoToggle.setAttribute('aria-expanded', String(isOpen));
+            mobileTreeInfoToggle.textContent = isOpen ? '転生情報を閉じる' : '転生情報を開く';
+        });
+        mobileLayout.addEventListener('change', () => {
+            mainScreen.classList.remove('shop-open');
+            prestigeScreen.classList.remove('tree-info-open');
+            mobileShopToggle.setAttribute('aria-expanded', 'false');
+            mobileTreeInfoToggle.setAttribute('aria-expanded', 'false');
+        });
+
+        // スキルツリーをドラッグ移動・ホイール/ピンチズーム・クリック選択
         let treeDrag = null;
+        let treePinch = null;
+        const activeTreePointers = new Map();
         pCanvas.addEventListener('pointerdown',e=>{
-            treeDrag={x:e.clientX,y:e.clientY,ox:treeCamera.x,oy:treeCamera.y,moved:false};
+            e.preventDefault();
             pCanvas.setPointerCapture(e.pointerId);
+            if (e.pointerType === 'touch') {
+                activeTreePointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+                if (activeTreePointers.size === 2) {
+                    const points=[...activeTreePointers.values()];
+                    treePinch={distance:Math.hypot(points[1].x-points[0].x,points[1].y-points[0].y),zoom:treeCamera.zoom};
+                    treeDrag=null;
+                    return;
+                }
+            }
+            treeDrag={id:e.pointerId,x:e.clientX,y:e.clientY,ox:treeCamera.x,oy:treeCamera.y,moved:false};
         });
         pCanvas.addEventListener('pointermove',e=>{
-            if(!treeDrag)return;
+            if (activeTreePointers.has(e.pointerId)) activeTreePointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+            if (treePinch && activeTreePointers.size === 2) {
+                const points=[...activeTreePointers.values()];
+                const distance=Math.hypot(points[1].x-points[0].x,points[1].y-points[0].y);
+                treeCamera.zoom=Math.max(.3,Math.min(1.65,treePinch.zoom*distance/treePinch.distance));
+                return;
+            }
+            if(!treeDrag || treeDrag.id!==e.pointerId)return;
             const dx=e.clientX-treeDrag.x,dy=e.clientY-treeDrag.y;
             if(Math.hypot(dx,dy)>6)treeDrag.moved=true;
             if(treeDrag.moved){treeCamera.x=treeDrag.ox+dx;treeCamera.y=treeDrag.oy+dy;}
         });
-        pCanvas.addEventListener('pointerup',e=>{
-            if(!treeDrag)return;
-            if(!treeDrag.moved){
-                const x=(e.clientX-pCanvas.width/2-treeCamera.x)/treeCamera.zoom;
-                const y=(e.clientY-pCanvas.height/2-treeCamera.y)/treeCamera.zoom;
-                const hit=Object.values(skills).find(n=>Math.hypot(x-n.x,y-n.y)<35);
-                selectedNodeId=hit?hit.id:null;
-                detailPanel.style.display=hit?'block':'none';updatePrestigeUI();
+        const endTreePointer=e=>{
+            const wasPinching=Boolean(treePinch);
+            activeTreePointers.delete(e.pointerId);
+            if (treePinch) treePinch=null;
+            if(treeDrag && treeDrag.id===e.pointerId){
+                if(!wasPinching && !treeDrag.moved){
+                    const x=(e.clientX-pCanvas.width/2-treeCamera.x)/treeCamera.zoom;
+                    const y=(e.clientY-pCanvas.height/2-treeCamera.y)/treeCamera.zoom;
+                    const hit=Object.values(skills).find(n=>Math.hypot(x-n.x,y-n.y)<35);
+                    selectedNodeId=hit?hit.id:null;
+                    detailPanel.style.display=hit?'block':'none';updatePrestigeUI();
+                }
+                treeDrag=null;
             }
-            treeDrag=null;
-        });
+        };
+        pCanvas.addEventListener('pointerup',endTreePointer);
+        pCanvas.addEventListener('pointercancel',endTreePointer);
         pCanvas.addEventListener('wheel',e=>{
             e.preventDefault();
             const newZoom=Math.max(.3,Math.min(1.65,treeCamera.zoom*(e.deltaY>0?.9:1.1)));
@@ -672,7 +726,6 @@
             treeCamera.y=py-(py-treeCamera.y)*newZoom/treeCamera.zoom;
             treeCamera.zoom=newZoom;
         },{passive:false});
-
         function initGame() {
             if (localStorage.getItem('cell_jars')) stockedJars = parseInt(localStorage.getItem('cell_jars'));
             if (localStorage.getItem('cell_total_jars')) totalJars = parseInt(localStorage.getItem('cell_total_jars'));
@@ -704,7 +757,7 @@
             updatePrestigeUI();
 
             cells = []; 
-            cells.push(new Cell(canvas.width / 2, canvas.height / 2, 28, 333, 100, 75, 0, 0));
+            cells.push(new Cell(canvas.width / 2, canvas.height / 2, cellBaseRadius(), 333, 100, 75, 0, 0));
             countDisplay.innerText = cells.length;
             saveToLocalStorage();
         }
@@ -718,6 +771,15 @@
             canvas.width = pCanvas.width = window.innerWidth;
             canvas.height = pCanvas.height = window.innerHeight;
             jarPos.x = canvas.width - 100; jarPos.y = canvas.height - 120;
+            updateCapacity();
+            const radius = cellBaseRadius();
+            cells.forEach(cell => {
+                cell.baseRadius = radius;
+                cell.radius = Math.min(cell.radius, radius);
+                cell.growthRate = (isMobileLayout() ? .65 : .5) * (1 + skills.grow.lvl * .3);
+                cell.x = Math.min(Math.max(cell.x, radius), canvas.width - radius);
+                cell.y = Math.min(Math.max(cell.y, radius), canvas.height - radius);
+            });
             initNodePositions();
         });
 
