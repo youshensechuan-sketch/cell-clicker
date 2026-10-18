@@ -180,8 +180,12 @@
             {shape:'eye',primary:'#f5ff6b',secondary:'#ff6b6b',symbol:'◉',orbs:0,spin:.35}
         ];
         const mutationEffects = {}; // id -> 終了時刻。転生時はリセット
+        const mutationEffectDurations = {};
         const mutationParticles = [];
         let mutationToastUntil = 0;
+        let lastEffectTimerUpdate = 0;
+        const effectTimerNames = { fertile: '増殖核', reach: '感覚拡張', frenzy: '過剰分裂', plague: '細胞毒', shrink: '神経萎縮' };
+        const effectTimerColors = { fertile: '#64ff8b', reach: '#58eaff', frenzy: '#ffdd55', plague: '#ff547b', shrink: '#ff8a45' };
         function randomItem(items) { return items[Math.floor(Math.random()*items.length)]; }
         function mutationChance() { return MUTATION_CHANCE + skills.mutationSignal.lvl * 0.025; }
         function mutationLifetime() { return MUTATION_LIFETIME + skills.mutationStasis.lvl * 8000; }
@@ -198,7 +202,62 @@
             return resolved;
         }
         function modifier(id) { return (mutationEffects[id] || 0) > Date.now(); }
-        function clearMutationEffects() { Object.keys(mutationEffects).forEach(k => delete mutationEffects[k]); mutationParticles.length=0; }
+        function clearMutationEffects() {
+            Object.keys(mutationEffects).forEach(k => delete mutationEffects[k]);
+            Object.keys(mutationEffectDurations).forEach(k => delete mutationEffectDurations[k]);
+            mutationParticles.length=0;
+            document.getElementById('effect-timers').replaceChildren();
+        }
+        function renderEffectTimers(now = Date.now()) {
+            const container = document.getElementById('effect-timers');
+            const active = Object.keys(effectTimerNames).filter(id => mutationEffects[id] > now);
+            const existing = new Map([...container.children].map(el => [el.dataset.effect, el]));
+            active.forEach(id => {
+                let item = existing.get(id);
+                if (!item) {
+                    item = document.createElement('div');
+                    item.className = 'effect-timer';
+                    item.dataset.effect = id;
+                    item.style.setProperty('--effect-color', effectTimerColors[id]);
+                    const svgNS = 'http://www.w3.org/2000/svg';
+                    const svg = document.createElementNS(svgNS, 'svg');
+                    svg.setAttribute('class', 'effect-clock'); svg.setAttribute('viewBox', '0 0 64 64');
+                    const face = document.createElementNS(svgNS, 'circle');
+                    face.setAttribute('class', 'clock-face'); face.setAttribute('cx', '32'); face.setAttribute('cy', '32'); face.setAttribute('r', '28'); svg.append(face);
+                    for (let tick = 0; tick < 12; tick++) {
+                        const angle = tick * Math.PI / 6 - Math.PI / 2;
+                        const mark = document.createElementNS(svgNS, 'line');
+                        mark.setAttribute('class', 'clock-tick');
+                        mark.setAttribute('x1', (32 + Math.cos(angle) * 23).toFixed(2)); mark.setAttribute('y1', (32 + Math.sin(angle) * 23).toFixed(2));
+                        mark.setAttribute('x2', (32 + Math.cos(angle) * 26).toFixed(2)); mark.setAttribute('y2', (32 + Math.sin(angle) * 26).toFixed(2)); svg.append(mark);
+                    }
+                    const trail = document.createElementNS(svgNS, 'path'); trail.setAttribute('class', 'clock-trail'); svg.append(trail);
+                    const hand = document.createElementNS(svgNS, 'line'); hand.setAttribute('class', 'clock-hand'); hand.setAttribute('x1', '32'); hand.setAttribute('y1', '32'); hand.setAttribute('y2', '9'); svg.append(hand);
+                    const center = document.createElementNS(svgNS, 'circle'); center.setAttribute('class', 'clock-center'); center.setAttribute('cx', '32'); center.setAttribute('cy', '32'); center.setAttribute('r', '2.5'); svg.append(center);
+                    const text = document.createElement('div');
+                    const name = document.createElement('div'); name.className = 'effect-timer-name';
+                    const time = document.createElement('div'); time.className = 'effect-timer-time';
+                    text.append(name, time); item.append(svg, text); container.append(item);
+                    item._timerParts = { trail, hand, name, time };
+                }
+                existing.delete(id);
+                const remaining = Math.max(0, mutationEffects[id] - now);
+                const duration = mutationEffectDurations[id] || remaining;
+                const progress = Math.min(.9999, Math.max(0, 1 - remaining / duration));
+                const angle = progress * Math.PI * 2 - Math.PI / 2;
+                const x = 32 + 25 * Math.cos(angle), y = 32 + 25 * Math.sin(angle);
+                const largeArc = progress > .5 ? 1 : 0;
+                const { trail, hand, name, time } = item._timerParts;
+                trail.setAttribute('d', progress > 0 ? `M 32 32 L 32 7 A 25 25 0 ${largeArc} 1 ${x.toFixed(2)} ${y.toFixed(2)} Z` : '');
+                hand.setAttribute('x2', (32 + 22 * Math.cos(angle)).toFixed(2));
+                hand.setAttribute('y2', (32 + 22 * Math.sin(angle)).toFixed(2));
+                name.textContent = effectTimerNames[id];
+                const seconds = Math.ceil(remaining / 1000);
+                time.textContent = seconds >= 60 ? `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}` : `${seconds}秒`;
+                item.setAttribute('aria-label', `${effectTimerNames[id]}、残り${time.textContent}`);
+            });
+            existing.forEach(item => item.remove());
+        }
         function showMutationToast(message,color='#9ff') {
             const el=document.getElementById('mutation-toast');
             el.textContent=message; el.style.color=color; el.style.opacity='1'; mutationToastUntil=performance.now()+2600;
@@ -230,6 +289,8 @@
             } else {
                 const seconds={fertile:25,reach:30,frenzy:12,plague:15,shrink:20}[type.id];
                 mutationEffects[type.id]=Date.now()+seconds*1000;
+                mutationEffectDurations[type.id]=seconds*1000;
+                renderEffectTimers();
             }
             if(type.id!=='drain')showMutationToast(`🧬 ${original.name} → ${type.name}！ ${type.desc}`,visual.primary);
         }
@@ -517,6 +578,11 @@
 
         // メインループ
         function animate() {
+            const timerNow = Date.now();
+            if (timerNow - lastEffectTimerUpdate >= 100) {
+                renderEffectTimers(timerNow);
+                lastEffectTimerUpdate = timerNow;
+            }
             if (currentScreen === 'main') {
                 ctx.fillStyle = isStocking ? 'rgba(10, 10, 10, 0.3)' : 'rgba(17, 17, 17, 1)';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);

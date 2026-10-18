@@ -68,6 +68,23 @@ body { margin: 0; overflow: hidden; background-color: #050508; font-family: 'Cou
         }
         .back-btn:hover { color: #fff; background: #333; }
         #mutation-toast { position:absolute; left:50%; top:19%; transform:translateX(-50%); z-index:30; color:white; font-weight:bold; text-align:center; pointer-events:none; text-shadow:0 2px 8px #000; font-size:19px; opacity:0; transition:opacity .2s; padding:12px; border-radius:12px; background:rgba(2,8,15,.78); max-width:70vw; }
+        #effect-timers {
+            position: absolute; z-index: 20; top: 16px; right: 16px; display: flex; flex-direction: column;
+            align-items: flex-end; gap: 8px; pointer-events: none;
+        }
+        .effect-timer {
+            display: flex; align-items: center; gap: 8px; min-width: 112px; padding: 5px 9px 5px 5px;
+            color: #fff; background: rgba(5, 8, 15, .86); border: 1px solid var(--effect-color);
+            border-radius: 999px; box-shadow: 0 2px 12px rgba(0,0,0,.38); font: 12px 'Courier New', monospace;
+        }
+        .effect-clock { width: 40px; height: 40px; flex: 0 0 40px; overflow: visible; }
+        .effect-clock .clock-face { fill: rgba(8, 14, 24, .96); stroke: var(--effect-color); stroke-width: 1.5; }
+        .effect-clock .clock-tick { stroke: #b6c4d3; stroke-width: 1.4; stroke-linecap: round; }
+        .effect-clock .clock-trail { fill: var(--effect-color); opacity: .72; }
+        .effect-clock .clock-hand { stroke: #fff; stroke-width: 1.8; stroke-linecap: round; }
+        .effect-clock .clock-center { fill: #fff; }
+        .effect-timer-name { font-weight: bold; white-space: nowrap; }
+        .effect-timer-time { margin-top: 2px; color: var(--effect-color); font-size: 11px; }
         .tp-value { color:#00e5ff; }
         .next-tp-info { font-size:10px; color:#aaa; margin: 5px 0; }
         @media(max-width:680px) { #mutation-toast {font-size:15px;} }
@@ -132,6 +149,9 @@ body { margin: 0; overflow: hidden; background-color: #050508; font-family: 'Cou
             #node-desc { font-size: 14px; line-height: 1.45; }
             .node-level-info { font-size: 13px; }
             #mutation-toast { top: calc(12% + env(safe-area-inset-top)); max-width: 86vw; font-size: 16px; }
+            #effect-timers { top: calc(10px + env(safe-area-inset-top)); right: 8px; gap: 5px; }
+            .effect-timer { min-width: 96px; gap: 6px; padding: 3px 7px 3px 3px; font-size: 11px; }
+            .effect-clock { width: 34px; height: 34px; flex-basis: 34px; }
         }
 
         @media (max-width: 380px) {
