@@ -121,7 +121,7 @@
         function pendingPrestigeTp() { return Math.max(0, calculateTotalTpFromJars(totalJars) - earnedTpLifetime); }
         function effectiveMaxCells() {
             const reduce = hasSkill('capacity3') ? .3 : hasSkill('capacity2') ? .2 : hasSkill('capacity1') ? .1 : 0;
-            const base = isMobileLayout() ? Math.min(120, Math.max(60, Math.floor(canvas.width * canvas.height / 5200))) : 200 + loopCount * 50;
+            const base = 200 + loopCount * 50;
             return Math.max(40, Math.ceil(base * (1 - reduce)));
         }
         function cellBaseRadius() { return isMobileLayout() ? 38 : 28; }

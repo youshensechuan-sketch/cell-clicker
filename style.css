@@ -99,7 +99,7 @@ body { margin: 0; overflow: hidden; background-color: #050508; font-family: 'Cou
                 box-shadow: 0 3px 14px rgba(0,0,0,.45); white-space: nowrap;
             }
             #mobile-shop-toggle { bottom: calc(12px + env(safe-area-inset-bottom)); }
-            #main-screen.shop-open #mobile-shop-toggle { display: none; }
+            #main-screen.shop-open #mobile-shop-toggle { display: block; bottom: auto; top: 10px; }
             #main-screen:not(.shop-open) #main-ui { transform: translateY(calc(100% + 1px)); pointer-events: none; }
             #main-screen:not(.shop-open) #main-ui button { pointer-events: none; }
             #main-screen:not(.shop-open) #mobile-shop-toggle { bottom: calc(12px + env(safe-area-inset-bottom)); }
@@ -116,7 +116,7 @@ body { margin: 0; overflow: hidden; background-color: #050508; font-family: 'Cou
             #mobile-tree-info-toggle { top: calc(12px + env(safe-area-inset-top)); }
             #prestige-screen:not(.tree-info-open) #prestige-ui-top { transform: translateY(calc(-100% - 1px)); pointer-events: none; }
             #prestige-screen:not(.tree-info-open) #prestige-ui-top button { pointer-events: none; }
-            #prestige-screen.tree-info-open #mobile-tree-info-toggle { display: none; }
+            #prestige-screen.tree-info-open #mobile-tree-info-toggle { display: block; top: auto; bottom: calc(12px + env(safe-area-inset-bottom)); }
             #node-detail-panel {
                 bottom: calc(12px + env(safe-area-inset-bottom)); left: 12px; right: 12px; width: auto;
                 box-sizing: border-box; padding: 12px 14px; max-height: 42dvh; overflow-y: auto;
