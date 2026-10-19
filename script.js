@@ -208,7 +208,10 @@
         }
         function modifier(id) { return (mutationEffects[id] || 0) > Date.now(); }
         function clickRangeMultiplier() {
-            return (modifier('reach') ? 2.2 : 1) * (modifier('shrink') ? .55 : 1) * (1 + skills.clickRange.lvl * .25);
+            const modifiedRange = (modifier('reach') ? 2.2 : 1)
+                * (modifier('shrink') ? .55 : 1)
+                * (1 + skills.clickRange.lvl * .25);
+            return Math.max(1, modifiedRange);
         }
         function pointerClickRadius() { return cellBaseRadius() * clickRangeMultiplier(); }
         function clearMutationEffects() {
@@ -468,7 +471,8 @@
         }
 
         function drawPointerRange() {
-            if (!pointerRangeVisible) return;
+            const multiplier = clickRangeMultiplier();
+            if (!pointerRangeVisible || multiplier <= 1) return;
             const range = pointerClickRadius();
             ctx.save();
             ctx.beginPath(); ctx.arc(pointerRangeX, pointerRangeY, range, 0, Math.PI * 2);
