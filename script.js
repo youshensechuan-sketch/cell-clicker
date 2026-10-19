@@ -74,6 +74,7 @@
         // Cookie Clickerの永久強化・分岐・割引・オフライン生産などを細胞向けに再設計。
         const skills = {
             packing: { id: 'packing', name: '高速瓶詰め', desc: '瓶詰めの移動演出を省略する。', lvl: 0, max: 1, cost: 1, requires: [], gx: 0, gy: 0, x: 0, y: 0 },
+            clickRange: { id: 'clickRange', name: '広域感覚', desc: '細胞をクリックできる範囲が25% / Lv広がる。範囲内の細胞をまとめてクリックする。', lvl: 0, max: 3, cost: 4, requires: ['packing'], gx: -1, gy: 0, x: 0, y: 0 },
             grow: { id: 'grow', name: '細胞膜強化', desc: '細胞の成長速度 +30% / Lv。', lvl: 0, max: 5, cost: 1, requires: ['packing'], gx: -1, gy: -1, x: 0, y: 0 },
             double: { id: 'double', name: '多重収穫', desc: '瓶詰め時に25% / Lvの確率で瓶をもう1個獲得。', lvl: 0, max: 3, cost: 2, requires: ['grow'], gx: -2, gy: -2, x: 0, y: 0 },
             burst: { id: 'burst', name: '異常繁殖', desc: '自動増殖時、10% / Lvの確率で発生数が3倍。', lvl: 0, max: 1, cost: 3, requires: ['grow'], gx: -1, gy: -2, x: 0, y: 0 },
@@ -202,6 +203,9 @@
             return resolved;
         }
         function modifier(id) { return (mutationEffects[id] || 0) > Date.now(); }
+        function clickRangeMultiplier() {
+            return (modifier('reach') ? 2.2 : 1) * (modifier('shrink') ? .55 : 1) * (1 + skills.clickRange.lvl * .25);
+        }
         function clearMutationEffects() {
             Object.keys(mutationEffects).forEach(k => delete mutationEffects[k]);
             Object.keys(mutationEffectDurations).forEach(k => delete mutationEffectDurations[k]);
@@ -387,6 +391,16 @@
             draw() {
                 ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
                 ctx.fillStyle = this.color; ctx.fill();
+                const clickRange = this.mutation
+                    ? Math.max(!this.isGrowing ? this.radius * clickRangeMultiplier() : 0, this.radius + 14)
+                    : (!this.isGrowing ? this.radius * clickRangeMultiplier() : 0);
+                if (clickRange > 0) {
+                    ctx.save();
+                    ctx.beginPath(); ctx.arc(this.x, this.y, clickRange, 0, Math.PI * 2);
+                    ctx.setLineDash([5, 4]); ctx.lineDashOffset = 0;
+                    ctx.strokeStyle = 'rgba(230, 245, 255, .72)'; ctx.lineWidth = 1.5; ctx.stroke();
+                    ctx.restore();
+                }
                 if (this.mutation) {
                     drawMutationVisual(this);
                 }
@@ -703,29 +717,29 @@
         // 通常クリック（細胞分裂）
         function handleCellTap(e) {
             if (isStocking) return;
-            for(const cell of cells){
-                if(cell.mutation && Math.hypot(e.clientX-cell.x,e.clientY-cell.y)<cell.radius+14){
-                    collectMutation(cell);cell.mutation=null;cell.mutationVisual=null;cell.color=getHslString(cell.h,cell.s,cell.l);return;
+            const clickedCells = [...cells];
+            const rangeMultiplier = clickRangeMultiplier();
+            let changed = false;
+            for (const cell of clickedCells) {
+                const index = cells.indexOf(cell);
+                if (index < 0) continue;
+                const dist = Math.hypot(e.clientX - cell.x, e.clientY - cell.y);
+                // 突然変異細胞は成長途中でも回収可能。回収した細胞は同じタップで分裂させない。
+                if (cell.mutation && dist < cell.radius + 14) {
+                    collectMutation(cell);
+                    cell.mutation = null; cell.mutationVisual = null;
+                    cell.color = getHslString(cell.h, cell.s, cell.l);
+                    changed = true;
+                    continue;
                 }
+                if (cell.isGrowing || dist >= cell.radius * rangeMultiplier || cells.length >= MAX_CELLS) continue;
+                const newCells = cell.split().slice(0, MAX_CELLS - cells.length + 1);
+                // クリックでできた子細胞のみ変異候補にする。自動生成は対象外。
+                if (newCells.length) pickMutation(newCells[Math.floor(Math.random() * newCells.length)]);
+                cells.splice(index, 1, ...newCells);
+                changed = true;
             }
-            for (let i = cells.length - 1; i >= 0; i--) {
-                const dx = e.clientX - cells[i].x; const dy = e.clientY - cells[i].y; const dist = Math.sqrt(dx * dx + dy * dy);
-                // 突然変異細胞は成長途中でも回収可能。通常の細胞より優先して判定する。
-                if(cells[i].mutation && dist < cells[i].radius+14) {
-                    collectMutation(cells[i]); cells[i].mutation=null;cells[i].mutationVisual=null;
-                    cells[i].color=getHslString(cells[i].h,cells[i].s,cells[i].l);
-                    return;
-                }
-                if (cells[i].isGrowing) continue;
-                const range=(modifier('reach')?2.2:1)*(modifier('shrink')?.55:1);
-                if (dist < cells[i].radius*range && cells.length < MAX_CELLS) {
-                    const newCells = cells[i].split().slice(0,MAX_CELLS-cells.length+1);
-                    // クリックでできた子細胞のみ変異候補にする。自動生成は対象外。
-                    if(newCells.length)pickMutation(newCells[Math.floor(Math.random()*newCells.length)]);
-                    cells.splice(i, 1, ...newCells); break;
-                }
-            }
-            countDisplay.innerText = cells.length;
+            if (changed) countDisplay.innerText = cells.length;
         }
         canvas.addEventListener('pointerdown', (e) => {
             if (e.pointerType === 'mouse' && e.button !== 0) return;
