@@ -210,6 +210,7 @@
         function clickRangeMultiplier() {
             return (modifier('reach') ? 2.2 : 1) * (modifier('shrink') ? .55 : 1) * (1 + skills.clickRange.lvl * .25);
         }
+        function pointerClickRadius() { return cellBaseRadius() * clickRangeMultiplier(); }
         function clearMutationEffects() {
             Object.keys(mutationEffects).forEach(k => delete mutationEffects[k]);
             Object.keys(mutationEffectDurations).forEach(k => delete mutationEffectDurations[k]);
@@ -468,7 +469,7 @@
 
         function drawPointerRange() {
             if (!pointerRangeVisible) return;
-            const range = cellBaseRadius() * clickRangeMultiplier();
+            const range = pointerClickRadius();
             ctx.save();
             ctx.beginPath(); ctx.arc(pointerRangeX, pointerRangeY, range, 0, Math.PI * 2);
             ctx.setLineDash([7, 5]); ctx.lineDashOffset = 0;
@@ -723,21 +724,23 @@
         function handleCellTap(e) {
             if (isStocking) return;
             const clickedCells = [...cells];
-            const rangeMultiplier = clickRangeMultiplier();
+            const range = pointerClickRadius();
             let changed = false;
             for (const cell of clickedCells) {
                 const index = cells.indexOf(cell);
                 if (index < 0) continue;
                 const dist = Math.hypot(e.clientX - cell.x, e.clientY - cell.y);
-                // 突然変異細胞は成長途中でも回収可能。回収した細胞は同じタップで分裂させない。
-                if (cell.mutation && dist < cell.radius + 14) {
+                if (dist >= range) continue;
+                // ポインタ範囲内の突然変異細胞は成長途中でも回収する。
+                // 回収した細胞は同じタップで分裂させない。
+                if (cell.mutation) {
                     collectMutation(cell);
                     cell.mutation = null; cell.mutationVisual = null;
                     cell.color = getHslString(cell.h, cell.s, cell.l);
                     changed = true;
                     continue;
                 }
-                if (cell.isGrowing || dist >= cell.radius * rangeMultiplier || cells.length >= MAX_CELLS) continue;
+                if (cell.isGrowing || cells.length >= MAX_CELLS) continue;
                 const newCells = cell.split().slice(0, MAX_CELLS - cells.length + 1);
                 // クリックでできた子細胞のみ変異候補にする。自動生成は対象外。
                 if (newCells.length) pickMutation(newCells[Math.floor(Math.random() * newCells.length)]);
