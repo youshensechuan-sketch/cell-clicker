@@ -70,6 +70,10 @@
         let totalJars = 0;        
         let prestigePoints = 0;   
         let loopCount = 0;        
+        let pointerRangeX = 0;
+        let pointerRangeY = 0;
+        let pointerRangeVisible = false;
+        let pointerRangeTimeout = null;
         
         // Cookie Clickerの永久強化・分岐・割引・オフライン生産などを細胞向けに再設計。
         const skills = {
@@ -391,16 +395,6 @@
             draw() {
                 ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
                 ctx.fillStyle = this.color; ctx.fill();
-                const clickRange = this.mutation
-                    ? Math.max(!this.isGrowing ? this.radius * clickRangeMultiplier() : 0, this.radius + 14)
-                    : (!this.isGrowing ? this.radius * clickRangeMultiplier() : 0);
-                if (clickRange > 0) {
-                    ctx.save();
-                    ctx.beginPath(); ctx.arc(this.x, this.y, clickRange, 0, Math.PI * 2);
-                    ctx.setLineDash([5, 4]); ctx.lineDashOffset = 0;
-                    ctx.strokeStyle = 'rgba(230, 245, 255, .72)'; ctx.lineWidth = 1.5; ctx.stroke();
-                    ctx.restore();
-                }
                 if (this.mutation) {
                     drawMutationVisual(this);
                 }
@@ -470,6 +464,16 @@
                 ctx.beginPath(); ctx.rect(x + 4, y + height - 4 - (height * fillPercent), width - 8, height * fillPercent);
                 ctx.fill();
             }
+        }
+
+        function drawPointerRange() {
+            if (!pointerRangeVisible) return;
+            const range = cellBaseRadius() * clickRangeMultiplier();
+            ctx.save();
+            ctx.beginPath(); ctx.arc(pointerRangeX, pointerRangeY, range, 0, Math.PI * 2);
+            ctx.setLineDash([7, 5]); ctx.lineDashOffset = 0;
+            ctx.strokeStyle = 'rgba(230, 245, 255, .92)'; ctx.lineWidth = 2; ctx.stroke();
+            ctx.restore();
         }
 
         // --- 数式ロジック ---
@@ -644,6 +648,7 @@
                     }
                 }
                 cells.forEach(cell => { cell.update(); cell.draw(); });
+                drawPointerRange();
                 drawMutationParticles();
                 if(performance.now()>mutationToastUntil)document.getElementById('mutation-toast').style.opacity='0';
                 if (isStocking) {
@@ -741,9 +746,19 @@
             }
             if (changed) countDisplay.innerText = cells.length;
         }
+        canvas.addEventListener('pointermove', e => {
+            if (e.pointerType === 'touch') return;
+            pointerRangeX = e.clientX; pointerRangeY = e.clientY; pointerRangeVisible = true;
+        });
+        canvas.addEventListener('pointerleave', () => { pointerRangeVisible = false; });
         canvas.addEventListener('pointerdown', (e) => {
             if (e.pointerType === 'mouse' && e.button !== 0) return;
             e.preventDefault();
+            pointerRangeX = e.clientX; pointerRangeY = e.clientY; pointerRangeVisible = true;
+            if (e.pointerType === 'touch') {
+                clearTimeout(pointerRangeTimeout);
+                pointerRangeTimeout = setTimeout(() => { pointerRangeVisible = false; }, 900);
+            }
             handleCellTap(e);
         });
 
