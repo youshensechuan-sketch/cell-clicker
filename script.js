@@ -11,6 +11,13 @@
         const mobileTreeInfoToggle = document.getElementById('mobile-tree-info-toggle');
         const mobileCountDisplay = document.getElementById('mobile-count');
         const mobileJarsDisplay = document.getElementById('mobile-jars');
+        const mobileHud = document.getElementById('mobile-hud');
+        const mainTpProgress = document.getElementById('main-tp-progress');
+        const mainTpProgressLabel = document.getElementById('main-tp-progress-label');
+        const mainTpProgressFill = document.getElementById('main-tp-progress-fill');
+        const mobileTpProgress = document.getElementById('mobile-tp-progress');
+        const mobileTpProgressLabel = document.getElementById('mobile-tp-progress-label');
+        const mobileTpProgressFill = document.getElementById('mobile-tp-progress-fill');
         const mobileLayout = window.matchMedia('(max-width: 680px)');
         const isMobileLayout = () => mobileLayout.matches;
 
@@ -214,6 +221,11 @@
             return Math.max(1, modifiedRange);
         }
         function pointerClickRadius() { return cellBaseRadius() * clickRangeMultiplier(); }
+        function isCellInPointerRange(cell) {
+            return pointerRangeVisible && !isStocking
+                && (cell.mutation || (!cell.isGrowing && cells.length < MAX_CELLS))
+                && Math.hypot(pointerRangeX - cell.x, pointerRangeY - cell.y) < pointerClickRadius();
+        }
         function clearMutationEffects() {
             Object.keys(mutationEffects).forEach(k => delete mutationEffects[k]);
             Object.keys(mutationEffectDurations).forEach(k => delete mutationEffectDurations[k]);
@@ -397,8 +409,18 @@
                 this.markedForRemoval = false;
             }
             draw() {
+                const pointerRange = isCellInPointerRange(this);
                 ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
                 ctx.fillStyle = this.color; ctx.fill();
+                if (pointerRange) {
+                    ctx.save();
+                    ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                    ctx.globalCompositeOperation = 'screen';
+                    ctx.fillStyle = 'rgba(255,255,255,.2)'; ctx.fill();
+                    ctx.shadowColor = '#e8fbff'; ctx.shadowBlur = 15;
+                    ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 1.5; ctx.stroke();
+                    ctx.restore();
+                }
                 if (this.mutation) {
                     drawMutationVisual(this);
                 }
@@ -471,9 +493,9 @@
         }
 
         function drawPointerRange() {
-            const multiplier = clickRangeMultiplier();
-            if (!pointerRangeVisible || multiplier <= 1) return;
-            const range = pointerClickRadius();
+            if (!pointerRangeVisible) return;
+            const range = pointerClickRadius() - cellBaseRadius();
+            if (range <= 0) return;
             ctx.save();
             ctx.beginPath(); ctx.arc(pointerRangeX, pointerRangeY, range, 0, Math.PI * 2);
             ctx.setLineDash([7, 5]); ctx.lineDashOffset = 0;
@@ -485,6 +507,23 @@
         function calculateTotalTpFromJars(jars) { return jars < 1 ? 0 : Math.floor(Math.sqrt(jars)); }
         function getJarsRequiredForTp(tp) { return Math.pow(tp, 2); }
 
+        function updateTpProgressUI() {
+            const show = loopCount > 0;
+            const totalEarnedTp = calculateTotalTpFromJars(totalJars);
+            const startJars = getJarsRequiredForTp(totalEarnedTp);
+            const targetJars = getJarsRequiredForTp(totalEarnedTp + 1);
+            const progress = Math.min(1, Math.max(0, (totalJars - startJars) / (targetJars - startJars)));
+            const label = `あと ${Math.max(0, targetJars - totalJars)} 瓶`;
+            mainTpProgress.hidden = !show;
+            mobileTpProgress.hidden = !show;
+            mobileHud.classList.toggle('has-tp-progress', show);
+            mainScreen.classList.toggle('has-tp-progress', show);
+            mainTpProgressLabel.textContent = label;
+            mobileTpProgressLabel.textContent = label;
+            mainTpProgressFill.style.width = `${progress * 100}%`;
+            mobileTpProgressFill.style.width = `${progress * 100}%`;
+        }
+
         function updateShopUI() {
             nutrientCost = Math.max(1, Math.ceil((nutrientLevel + 1) * (1 - getDiscount()))); cultureFluidCost = Math.max(1, Math.ceil((cultureFluidLevel + 1) * (1 - getDiscount())));
             nutrientLvlDisplay.innerText = nutrientLevel; nutrientCostDisplay.innerText = nutrientCost;
@@ -495,6 +534,7 @@
 
         function updatePrestigeUI() {
             totalJarsDisplay.innerText = totalJars; tpDisplay.innerText = prestigePoints;
+            updateTpProgressUI();
             
             const totalEarnedTp = calculateTotalTpFromJars(totalJars);
             const pendingTp = pendingPrestigeTp();

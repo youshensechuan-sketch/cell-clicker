@@ -13,6 +13,10 @@
         <div id="main-ui" class="ui-panel" aria-label="培養室の情報とショップ">
             <h1>細胞数: <span id="count">0</span> / <span id="max-count">200</span></h1>
             <h2>瓶のストック: <span id="jar-count">0</span></h2>
+            <div id="main-tp-progress" class="tp-progress" hidden>
+                <div class="tp-progress-heading"><span>次の転生ポイント</span><span id="main-tp-progress-label"></span></div>
+                <div class="tp-progress-track"><div id="main-tp-progress-fill" class="tp-progress-fill"></div></div>
+            </div>
             <p>細胞をクリックして分裂・進化させよう</p>
             <p id="condition-text">200個に達すると瓶詰めされます</p>
             
@@ -34,6 +38,10 @@
             <div class="mobile-stat"><span>細胞</span><strong id="mobile-count">0 / 200</strong></div>
             <div class="mobile-stat"><span>瓶</span><strong id="mobile-jars">0</strong></div>
             <button id="mobile-shop-toggle" type="button" aria-expanded="false" aria-controls="main-ui">ショップを開く</button>
+            <div id="mobile-tp-progress" class="mobile-tp-progress" hidden>
+                <div class="tp-progress-heading"><span>次のTP</span><span id="mobile-tp-progress-label"></span></div>
+                <div class="tp-progress-track"><div id="mobile-tp-progress-fill" class="tp-progress-fill"></div></div>
+            </div>
         </div>
         <canvas id="gameCanvas"></canvas>
         <div id="effect-timers" aria-label="時間制限のある効果"></div>
